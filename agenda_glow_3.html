@@ -1,0 +1,2286 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Agenda Glow — Sistema de agendamento para estúdios de estética</title>
+
+<!-- PWA: aparece como app no celular -->
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Agenda Glow" />
+<meta name="application-name" content="Agenda Glow" />
+<meta name="theme-color" content="#0F0D12" />
+<meta name="description" content="Sistema de agendamento para estúdios de estética. Agenda, clientes e notificações no WhatsApp." />
+
+<!-- Ícone PWA inline via SVG como data URL -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%230F0D12'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23C77DFF'/%3E%3Cstop offset='100%25' stop-color='%23E8C4A0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M96 44l13 39 39 13-39 13-13 39-13-39-39-13 39-13z' fill='url(%23g)'/%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%230F0D12'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23C77DFF'/%3E%3Cstop offset='100%25' stop-color='%23E8C4A0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M96 44l13 39 39 13-39 13-13 39-13-39-39-13 39-13z' fill='url(%23g)'/%3E%3C/svg%3E" type="image/svg+xml" />
+
+<!-- Manifest PWA inline -->
+<script>
+(function() {
+  const manifest = {
+    name: "Agenda Glow",
+    short_name: "Agenda Glow",
+    description: "Sistema de agendamento para estúdios de estética",
+    start_url: "./",
+    display: "standalone",
+    background_color: "#0F0D12",
+    theme_color: "#0F0D12",
+    orientation: "portrait-primary",
+    icons: [
+      {
+        src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%230F0D12'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23C77DFF'/%3E%3Cstop offset='100%25' stop-color='%23E8C4A0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M96 44l13 39 39 13-39 13-13 39-13-39-39-13 39-13z' fill='url(%23g)'/%3E%3C/svg%3E",
+        sizes: "192x192",
+        type: "image/svg+xml",
+        purpose: "any maskable"
+      }
+    ]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('link');
+  link.rel = 'manifest';
+  link.href = url;
+  document.currentScript.after(link);
+})();
+</script>
+
+<!-- Service Worker para funcionar offline -->
+<script>
+if ('serviceWorker' in navigator) {
+  const swCode = `
+    const CACHE = 'agendaglow-v1';
+    self.addEventListener('install', e => {
+      e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './index.html'])).catch(()=>{}));
+      self.skipWaiting();
+    });
+    self.addEventListener('activate', e => {
+      e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
+      self.clients.claim();
+    });
+    self.addEventListener('fetch', e => {
+      e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    });
+  `;
+  const blob = new Blob([swCode], {type: 'application/javascript'});
+  const url = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(url).catch(() => {});
+}
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<style>
+  :root{
+    --bg-0:#0F0D12;
+    --bg-1:#171319;
+    --bg-2:#1F1922;
+    --bg-card:#211B26;
+    --line:rgba(245,240,232,0.09);
+    --line-strong:rgba(245,240,232,0.16);
+    --gold:#E8C4A0;
+    --gold-deep:#C99A6C;
+    --lilac:#C77DFF;
+    --lilac-deep:#9D4EDD;
+    --text-0:#F5F0E8;
+    --text-1:#C9C2D1;
+    --text-2:#8B8594;
+    --success:#7FD9A8;
+    --danger:#E8849A;
+    --radius-sm:10px;
+    --radius-md:16px;
+    --radius-lg:24px;
+    --serif:'Fraunces', serif;
+    --sans:'Inter', -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{background:var(--bg-0); color:var(--text-0); font-family:var(--sans); -webkit-font-smoothing:antialiased;}
+  body{overflow-x:hidden;}
+  #root{min-height:100vh;}
+  a{color:inherit; text-decoration:none;}
+  button{font-family:inherit; cursor:pointer;}
+  input,select,textarea{font-family:inherit;}
+  ::selection{background:var(--lilac-deep); color:white;}
+  ::-webkit-scrollbar{width:10px; height:10px;}
+  ::-webkit-scrollbar-track{background:var(--bg-0);}
+  ::-webkit-scrollbar-thumb{background:var(--bg-2); border-radius:8px;}
+  .serif{font-family:var(--serif);}
+  .container{max-width:1180px; margin:0 auto; padding:0 28px;}
+  @media (max-width:720px){ .container{padding:0 18px;} }
+
+  /* glow signature element */
+  .glow-ring{
+    position:absolute; border-radius:50%;
+    filter: blur(60px);
+    opacity:0.55;
+    pointer-events:none;
+  }
+  @keyframes drift{
+    0%,100%{ transform: translate(0,0) scale(1); }
+    50%{ transform: translate(20px,-16px) scale(1.06); }
+  }
+  @keyframes pulse-soft{
+    0%,100%{ opacity:0.4; }
+    50%{ opacity:0.7; }
+  }
+  .reveal{
+    opacity:0; transform: translateY(14px);
+    animation: revealUp 0.7s cubic-bezier(.16,1,.3,1) forwards;
+  }
+  @keyframes revealUp{ to{ opacity:1; transform:translateY(0); } }
+
+  @media (prefers-reduced-motion: reduce){
+    .glow-ring{ animation:none !important; }
+    .reveal{ animation:none !important; opacity:1; transform:none; }
+  }
+
+  input[type=text], input[type=email], input[type=password], input[type=tel], input[type=number], input[type=date], input[type=time], select, textarea{
+    width:100%;
+    background: var(--bg-1);
+    border:1px solid var(--line-strong);
+    color:var(--text-0);
+    border-radius: var(--radius-sm);
+    padding:11px 14px;
+    font-size:14.5px;
+    outline:none;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  input::placeholder, textarea::placeholder{ color:var(--text-2); }
+  input:focus, select:focus, textarea:focus{
+    border-color: var(--lilac-deep);
+    box-shadow: 0 0 0 3px rgba(157,78,221,0.18);
+  }
+  label{ font-size:13px; color:var(--text-1); display:block; margin-bottom:6px; font-weight:500; }
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    border:none; border-radius: var(--radius-sm);
+    font-weight:600; font-size:14.5px;
+    padding:12px 22px;
+    transition: transform .15s ease, opacity .15s ease, box-shadow .15s ease;
+  }
+  .btn:active{ transform: scale(0.97); }
+  .btn-primary{
+    background: linear-gradient(135deg, var(--lilac) 0%, var(--lilac-deep) 100%);
+    color:#fff;
+    box-shadow: 0 8px 24px -8px rgba(157,78,221,0.55);
+  }
+  .btn-primary:hover{ box-shadow: 0 10px 28px -6px rgba(157,78,221,0.7); }
+  .btn-gold{
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-deep) 100%);
+    color:#241A12;
+    box-shadow: 0 8px 24px -8px rgba(232,196,160,0.45);
+  }
+  .btn-ghost{
+    background: transparent; color:var(--text-0);
+    border:1px solid var(--line-strong);
+  }
+  .btn-ghost:hover{ background: var(--bg-2); }
+  .btn-block{ width:100%; }
+  .btn-sm{ padding:8px 14px; font-size:13px; }
+
+  .card{
+    background: var(--bg-card);
+    border:1px solid var(--line);
+    border-radius: var(--radius-md);
+    padding:24px;
+  }
+
+  .badge{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:12px; font-weight:600;
+    padding:5px 11px; border-radius:100px;
+  }
+  .badge-gold{ background: rgba(232,196,160,0.14); color:var(--gold); border:1px solid rgba(232,196,160,0.3); }
+  .badge-lilac{ background: rgba(199,125,255,0.14); color:var(--lilac); border:1px solid rgba(199,125,255,0.3); }
+  .badge-success{ background: rgba(127,217,168,0.14); color:var(--success); border:1px solid rgba(127,217,168,0.3); }
+  .badge-danger{ background: rgba(232,132,154,0.14); color:var(--danger); border:1px solid rgba(232,132,154,0.3); }
+  .badge-gray{ background: var(--bg-2); color:var(--text-2); border:1px solid var(--line); }
+
+  table{ width:100%; border-collapse:collapse; }
+  th{ text-align:left; font-size:12px; color:var(--text-2); font-weight:600; text-transform:uppercase; letter-spacing:0.04em; padding:10px 12px; border-bottom:1px solid var(--line); }
+  td{ padding:13px 12px; font-size:14px; border-bottom:1px solid var(--line); }
+  tr:last-child td{ border-bottom:none; }
+
+  .icon{ width:18px; height:18px; display:inline-block; vertical-align:middle; }
+
+  .toast{
+    position:fixed; bottom:24px; right:24px; z-index:999;
+    background: var(--bg-card); border:1px solid var(--line-strong);
+    border-radius: var(--radius-sm); padding:14px 18px;
+    display:flex; align-items:center; gap:10px;
+    box-shadow: 0 12px 32px -8px rgba(0,0,0,0.5);
+    animation: toastIn .3s cubic-bezier(.16,1,.3,1);
+    font-size:14px;
+  }
+  @keyframes toastIn{ from{ opacity:0; transform: translateY(12px);} to{ opacity:1; transform:none; } }
+
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(8,6,10,0.7);
+    display:flex; align-items:center; justify-content:center;
+    z-index:998; padding:20px; backdrop-filter: blur(4px);
+  }
+  .modal{
+    background: var(--bg-card); border:1px solid var(--line-strong);
+    border-radius: var(--radius-md); padding:28px;
+    max-width:480px; width:100%; max-height:88vh; overflow-y:auto;
+    animation: modalIn .25s cubic-bezier(.16,1,.3,1);
+  }
+  @keyframes modalIn{ from{ opacity:0; transform: scale(0.96) translateY(8px); } to{ opacity:1; transform:none; } }
+
+  .sidebar-link{
+    display:flex; align-items:center; gap:11px;
+    padding:10px 14px; border-radius:var(--radius-sm);
+    font-size:14px; font-weight:500; color:var(--text-1);
+    transition: background .15s ease, color .15s ease;
+  }
+  .sidebar-link:hover{ background: var(--bg-2); color:var(--text-0); }
+  .sidebar-link.active{ background: rgba(199,125,255,0.12); color:var(--lilac); }
+
+  .tab{
+    padding:9px 18px; border-radius:100px; font-size:13.5px; font-weight:600;
+    color:var(--text-2); cursor:pointer; transition: all .15s ease;
+    border:1px solid transparent;
+  }
+  .tab.active{ background: var(--bg-2); color:var(--text-0); border-color:var(--line-strong); }
+
+  .skel{ background: linear-gradient(90deg, var(--bg-1) 0%, var(--bg-2) 50%, var(--bg-1) 100%); background-size:200% 100%; animation: skel 1.4s ease infinite; border-radius:8px; }
+  @keyframes skel{ to{ background-position: -200% 0; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useRef, createContext, useContext } = React;
+
+/* ============================================================
+   ICONS — minimal inline SVG set, stroke-based, no external deps
+   ============================================================ */
+const Icon = ({ name, size = 18, ...props }) => {
+  const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", ...props };
+  const paths = {
+    calendar: <><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 10h18"/></>,
+    whatsapp: <path d="M17.5 14.4c-.3-.1-1.7-.8-2-.9-.3-.1-.5-.1-.6.1-.2.3-.7.9-.9 1-.2.2-.3.2-.6.1-1.6-.8-2.7-1.5-3.8-3.3-.3-.5.3-.5.8-1.6.1-.2 0-.4-.1-.5-.1-.1-.5-1.2-.7-1.6-.2-.4-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.4-.2.3-.9 1-.9 2.3 0 1.4 1 2.7 1.1 2.9.1.2 1.9 3 4.7 4.1 2.3.9 2.7.7 3.2.7.5-.1 1.7-.7 1.9-1.4.2-.7.2-1.2.1-1.4-.1-.1-.3-.2-.5-.3z M12 2C6.5 2 2 6.5 2 12c0 1.9.5 3.7 1.5 5.2L2 22l4.9-1.3c1.5.8 3.2 1.3 5.1 1.3 5.5 0 10-4.5 10-10S17.5 2 12 2z"/>,
+    check: <path d="M20 6L9 17l-5-5"/>,
+    x: <path d="M18 6L6 18M6 6l12 12"/>,
+    chevronRight: <path d="M9 18l6-6-6-6"/>,
+    chevronDown: <path d="M6 9l6 6 6-6"/>,
+    chevronLeft: <path d="M15 18l-6-6 6-6"/>,
+    plus: <path d="M12 5v14M5 12h14"/>,
+    user: <><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-7 8-7s8 3 8 7"/></>,
+    users: <><circle cx="9" cy="8" r="3.5"/><path d="M2 21c0-3.5 3-6 7-6s7 2.5 7 6"/><path d="M16 4.5c1.5.3 2.5 1.6 2.5 3.2 0 1.5-1 2.8-2.4 3.2M19 14.5c2 .4 4 2 4 5.5"/></>,
+    money: <><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="3"/><path d="M6 6V5a2 2 0 012-2h8a2 2 0 012 2v1"/></>,
+    settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6V19a2 2 0 01-4 0v-.2a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.6-1H5a2 2 0 010-4h.2a1.7 1.7 0 001.6-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3h.1A1.7 1.7 0 0012 3.2V3a2 2 0 014 0v.2a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9v.1a1.7 1.7 0 001.5 1H21a2 2 0 010 4h-.2a1.7 1.7 0 00-1.4 1z"/></>,
+    logout: <><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></>,
+    bell: <><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></>,
+    crown: <path d="M3 18h18l-1.5-9-4.5 4-3-6.5-3 6.5-4.5-4L3 18z"/>,
+    sparkle: <path d="M12 3l1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5L12 3z"/>,
+    chart: <><path d="M3 3v18h18"/><path d="M7 16l4-5 3 3 5-7"/></>,
+    building: <><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 21v-4h6v4M9 8h1M14 8h1M9 12h1M14 12h1"/></>,
+    link: <path d="M9 17H7a5 5 0 010-10h2M15 7h2a5 5 0 010 10h-2M8 12h8"/>,
+    copy: <><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></>,
+    clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
+    phone: <path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/>,
+    mail: <><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 6l10 7 10-7"/></>,
+    scissors: <><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.5 15.5M8.5 8.5L20 20"/></>,
+    pix: <path d="M12 3l9 9-9 9-9-9 9-9zM9 9l3 3 3-3M9 15l3-3 3 3"/>,
+    card: <><rect x="2" y="5" width="20" height="15" rx="2"/><path d="M2 10h20M6 15h4"/></>,
+    barcode: <><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M7 4v16M11 4v16M14 4v16M17 4v16"/></>,
+    trash: <path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m2 0l-.7 12.3a2 2 0 01-2 1.7H8.7a2 2 0 01-2-1.7L6 7"/>,
+    edit: <path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/>,
+    arrowRight: <path d="M5 12h14M13 6l6 6-6 6"/>,
+    star: <path d="M12 2l3 7 7 1-5.5 5 1.5 7-6-3.5L6 22l1.5-7L2 10l7-1 3-7z"/>,
+    shield: <path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/>,
+    eye: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></>,
+    eyeOff: <><path d="M3 3l18 18"/><path d="M10.6 5.1A10.6 10.6 0 0112 5c6.5 0 10 7 10 7a13.2 13.2 0 01-2.6 3.4M6.6 6.6A13 13 0 002 12s3.5 7 10 7a10.5 10.5 0 004.3-.9"/><path d="M9.5 9.7a3 3 0 004.2 4.2"/></>,
+    menu: <path d="M4 7h16M4 12h16M4 17h16"/>,
+    download: <><path d="M12 3v13m0 0l-4-4m4 4l4-4"/><path d="M4 19h16"/></>,
+    instagram: <><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="0.6" fill="currentColor"/></>,
+    info: <><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/></>,
+    alertTriangle: <path d="M12 3l10 18H2L12 3zM12 9v5M12 17h.01"/>,
+  };
+  return <svg {...common}>{paths[name] || null}</svg>;
+};
+
+/* ============================================================
+   FORMATTERS
+   ============================================================ */
+const fmtBRL = (n) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const fmtDate = (iso) => {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+};
+const fmtDateLong = (iso) => {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" });
+};
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const addDays = (iso, n) => {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+const uid = (p = "id") => `${p}_${Math.random().toString(36).slice(2, 9)}`;
+const slugify = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+const initials = (name) => name.split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
+
+/* ============================================================
+   STORAGE — usa localStorage para funcionar em qualquer navegador
+   ============================================================ */
+const Store = {
+  async get(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (e) { return fallback; }
+  },
+  async set(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+  },
+};
+
+/* ============================================================
+   SEED DATA — demo content so the product feels alive immediately
+   ============================================================ */
+const PLAN_PRICES = { mensal: 19.9, anual: 197 };
+
+const PAYMENT_METHODS = [
+  { id: "pix", label: "Pix", icon: "pix", desc: "Aprovação na hora" },
+  { id: "cartao", label: "Cartão de crédito", icon: "card", desc: "Em até 12x" },
+  { id: "boleto", label: "Boleto", icon: "barcode", desc: "Vencimento em 3 dias" },
+];
+
+const SERVICE_TEMPLATES = [
+  { name: "Limpeza de pele", duration: 60, price: 120 },
+  { name: "Design de sobrancelha", duration: 30, price: 45 },
+  { name: "Massagem relaxante", duration: 50, price: 140 },
+  { name: "Drenagem linfática", duration: 60, price: 130 },
+  { name: "Micropigmentação", duration: 90, price: 350 },
+  { name: "Peeling facial", duration: 45, price: 160 },
+];
+
+function seedStudio(name, slug, owner, plan) {
+  const clients = [
+    { id: uid("cli"), name: "Ana Carolina Souza", phone: "11 98888-1234" },
+    { id: uid("cli"), name: "Beatriz Lima", phone: "11 97777-2345" },
+    { id: uid("cli"), name: "Camila Ferreira", phone: "11 96666-3456" },
+    { id: uid("cli"), name: "Daniela Rocha", phone: "11 95555-4567" },
+  ];
+  const services = SERVICE_TEMPLATES.slice(0, 4).map(s => ({ id: uid("srv"), ...s }));
+  const today = todayISO();
+  const appointments = [
+    { id: uid("apt"), clientId: clients[0].id, serviceId: services[0].id, date: today, time: "09:00", status: "confirmado" },
+    { id: uid("apt"), clientId: clients[1].id, serviceId: services[1].id, date: today, time: "11:00", status: "confirmado" },
+    { id: uid("apt"), clientId: clients[2].id, serviceId: services[2].id, date: addDays(today, 1), time: "14:00", status: "pendente" },
+    { id: uid("apt"), clientId: clients[3].id, serviceId: services[0].id, date: addDays(today, 2), time: "10:00", status: "confirmado" },
+  ];
+  const payments = [
+    { id: uid("pay"), label: "Assinatura Agenda Glow — Plano " + (plan === "anual" ? "Anual" : "Mensal"), amount: PLAN_PRICES[plan], date: addDays(today, -30), method: "pix", status: "pago" },
+    { id: uid("pay"), label: "Assinatura Agenda Glow — Plano " + (plan === "anual" ? "Anual" : "Mensal"), amount: PLAN_PRICES[plan], date: today, method: "pix", status: "pago" },
+  ];
+  return {
+    id: uid("studio"),
+    name, slug, owner,
+    plan, planStatus: "ativo",
+    createdAt: addDays(today, -30),
+    nextBilling: addDays(today, plan === "anual" ? 335 : 1),
+    whatsappNumber: "11 90000-0000",
+    whatsappNotifications: true,
+    color: "lilac",
+    clients, services, appointments, payments,
+  };
+}
+
+const DEMO_OWNER = { name: "Mariana Castro", email: "mariana@exemplo.com", password: "123456" };
+const DEMO_STUDIO = seedStudio("Studio Mariana Castro Estética", "studio-mariana-castro", DEMO_OWNER, "mensal");
+
+const ADMIN_CRED = { email: "joaocesar8010@outlook.com", password: "Joka2203" };
+
+// Lista de e-mails com acesso gratuito liberado pelo admin
+const FREE_ACCESS_LIST_KEY = "agendaglow:free_access";
+function getFreeList() {
+  try { return JSON.parse(localStorage.getItem(FREE_ACCESS_LIST_KEY) || "[]"); } catch(e) { return []; }
+}
+function saveFreeList(list) {
+  try { localStorage.setItem(FREE_ACCESS_LIST_KEY, JSON.stringify(list)); } catch(e) {}
+}
+
+function makeInitialDB() {
+  const extra1 = seedStudio("Bella Pele Estética", "bella-pele", { name: "Juliana Alves", email: "juliana@exemplo.com", password: "123456" }, "anual");
+  const extra2 = seedStudio("Espaço Renove", "espaco-renove", { name: "Patrícia Gomes", email: "patricia@exemplo.com", password: "123456" }, "mensal");
+  return {
+    studios: [DEMO_STUDIO, extra1, extra2],
+  };
+}
+
+/* ============================================================
+   GLOBAL APP CONTEXT
+   ============================================================ */
+const AppCtx = createContext(null);
+const useApp = () => useContext(AppCtx);
+
+function useToast() {
+  const { setToast } = useApp();
+  return (msg, type = "success") => {
+    setToast({ msg, type, key: uid("t") });
+  };
+}
+
+/* ============================================================
+   SHARED UI BITS
+   ============================================================ */
+function Toast({ toast }) {
+  if (!toast) return null;
+  const color = toast.type === "error" ? "var(--danger)" : toast.type === "info" ? "var(--lilac)" : "var(--success)";
+  const icon = toast.type === "error" ? "x" : toast.type === "info" ? "info" : "check";
+  return (
+    <div className="toast" key={toast.key}>
+      <span style={{ color }}><Icon name={icon} size={18} /></span>
+      <span>{toast.msg}</span>
+    </div>
+  );
+}
+
+function Modal({ onClose, children, width }) {
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+  return (
+    <div className="modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" style={width ? { maxWidth: width } : {}}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ModalHeader({ title, onClose }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+      <h3 className="serif" style={{ fontSize: 21, fontWeight: 500 }}>{title}</h3>
+      <button onClick={onClose} className="btn btn-ghost" style={{ padding: 8, borderRadius: 100 }} aria-label="Fechar">
+        <Icon name="x" size={16} />
+      </button>
+    </div>
+  );
+}
+
+function StatusBadge({ status }) {
+  const map = {
+    confirmado: { cls: "badge-success", label: "Confirmado" },
+    pendente: { cls: "badge-gold", label: "Pendente" },
+    cancelado: { cls: "badge-danger", label: "Cancelado" },
+    concluido: { cls: "badge-lilac", label: "Concluído" },
+    pago: { cls: "badge-success", label: "Pago" },
+    atrasado: { cls: "badge-danger", label: "Atrasado" },
+    ativo: { cls: "badge-success", label: "Ativo" },
+    inadimplente: { cls: "badge-danger", label: "Inadimplente" },
+    cancelado_plano: { cls: "badge-gray", label: "Cancelado" },
+  };
+  const m = map[status] || { cls: "badge-gray", label: status };
+  return <span className={`badge ${m.cls}`}>{m.label}</span>;
+}
+
+function Avatar({ name, size = 38, tone = "lilac" }) {
+  const bg = tone === "lilac" ? "rgba(199,125,255,0.16)" : "rgba(232,196,160,0.16)";
+  const color = tone === "lilac" ? "var(--lilac)" : "var(--gold)";
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%", background: bg, color,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontWeight: 700, fontSize: size * 0.36, flexShrink: 0,
+    }}>
+      {initials(name)}
+    </div>
+  );
+}
+
+function EmptyState({ icon, title, body, action }) {
+  return (
+    <div style={{ textAlign: "center", padding: "56px 24px", color: "var(--text-2)" }}>
+      <div style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--bg-2)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px", color: "var(--lilac)" }}>
+        <Icon name={icon} size={24} />
+      </div>
+      <p className="serif" style={{ fontSize: 18, color: "var(--text-0)", marginBottom: 6 }}>{title}</p>
+      <p style={{ fontSize: 14, maxWidth: 360, margin: "0 auto 18px" }}>{body}</p>
+      {action}
+    </div>
+  );
+}
+
+function Field({ label, children }) {
+  return <div style={{ marginBottom: 16 }}><label>{label}</label>{children}</div>;
+}
+
+function ToggleSwitch({ checked, onChange, label, sub }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+      <div>
+        {label && <p style={{ fontSize: 14.5, fontWeight: 500, marginBottom: sub ? 2 : 0 }}>{label}</p>}
+        {sub && <p style={{ fontSize: 13, color: "var(--text-2)" }}>{sub}</p>}
+      </div>
+      <button
+        onClick={() => onChange(!checked)}
+        aria-pressed={checked}
+        style={{
+          width: 44, height: 26, borderRadius: 100, border: "none", flexShrink: 0,
+          background: checked ? "var(--lilac-deep)" : "var(--bg-2)",
+          position: "relative", transition: "background .2s ease",
+        }}
+      >
+        <span style={{
+          position: "absolute", top: 3, left: checked ? 21 : 3,
+          width: 20, height: 20, borderRadius: "50%", background: "#fff",
+          transition: "left .2s cubic-bezier(.16,1,.3,1)",
+        }} />
+      </button>
+    </div>
+  );
+}
+
+/* ============================================================
+   LANDING PAGE — public sales page
+   ============================================================ */
+function GlowRings() {
+  return (
+    <>
+      <div className="glow-ring" style={{ width: 460, height: 460, top: -120, left: "8%", background: "var(--lilac-deep)", animation: "drift 14s ease-in-out infinite" }} />
+      <div className="glow-ring" style={{ width: 380, height: 380, top: 60, right: "6%", background: "var(--gold)", animation: "drift 18s ease-in-out infinite reverse" }} />
+    </>
+  );
+}
+
+function NavBar({ onLogin, onSignup }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(15,13,18,0.78)", backdropFilter: "blur(14px)", borderBottom: "1px solid var(--line)" }}>
+      <div className="container" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 72 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 9, background: "linear-gradient(135deg, var(--lilac), var(--gold))", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Icon name="sparkle" size={17} color="#1A1420" />
+          </div>
+          <span className="serif" style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.01em" }}>Agenda Glow</span>
+        </div>
+        <div className="nav-desktop" style={{ display: "flex", alignItems: "center", gap: 28 }}>
+          <a href="#planos" style={{ fontSize: 14.5, color: "var(--text-1)" }}>Planos</a>
+          <a href="#recursos" style={{ fontSize: 14.5, color: "var(--text-1)" }}>Recursos</a>
+          <a href="#faq" style={{ fontSize: 14.5, color: "var(--text-1)" }}>Dúvidas</a>
+          <button className="btn btn-ghost btn-sm" onClick={onLogin}>Entrar</button>
+          <button className="btn btn-primary btn-sm" onClick={onSignup}>Criar minha agenda</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Hero({ onSignup }) {
+  return (
+    <div style={{ position: "relative", overflow: "hidden", paddingTop: 86, paddingBottom: 70 }}>
+      <GlowRings />
+      <div className="container" style={{ position: "relative", zIndex: 1, textAlign: "center" }}>
+        <div className="reveal badge badge-lilac" style={{ marginBottom: 22 }}>
+          <Icon name="sparkle" size={13} /> Feito para estúdios de estética e beleza
+        </div>
+        <h1 className="reveal serif" style={{ fontSize: "clamp(34px, 5.4vw, 62px)", fontWeight: 500, lineHeight: 1.08, letterSpacing: "-0.01em", maxWidth: 880, margin: "0 auto 22px", animationDelay: "0.05s" }}>
+          Sua agenda cheia,<br />sem mensagem perdida no <span style={{ color: "var(--gold)" }}>WhatsApp</span>
+        </h1>
+        <p className="reveal" style={{ fontSize: 17.5, color: "var(--text-1)", maxWidth: 560, margin: "0 auto 36px", lineHeight: 1.6, animationDelay: "0.1s" }}>
+          Clientes agendam direto pelo link, recebem lembrete automático no WhatsApp e você nunca mais perde horário por esquecimento. Tudo isso por menos de R$ 1 por dia.
+        </p>
+        <div className="reveal" style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap", animationDelay: "0.15s" }}>
+          <button className="btn btn-primary" style={{ padding: "14px 28px", fontSize: 15.5 }} onClick={onSignup}>
+            Criar minha agenda agora <Icon name="arrowRight" size={16} />
+          </button>
+          <a href="#planos" className="btn btn-ghost" style={{ padding: "14px 28px", fontSize: 15.5 }}>
+            Ver planos e preços
+          </a>
+        </div>
+        <p className="reveal" style={{ fontSize: 13, color: "var(--text-2)", marginTop: 18, animationDelay: "0.2s" }}>
+          Sem contrato de fidelidade · Cancele quando quiser · A partir de R$ 19,90/mês
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function MiniPhoneMock() {
+  return (
+    <div style={{ background: "var(--bg-1)", border: "1px solid var(--line-strong)", borderRadius: 26, padding: 18, maxWidth: 300, margin: "0 auto", boxShadow: "0 30px 60px -20px rgba(0,0,0,0.6)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 14 }}>
+        <div style={{ width: 30, height: 30, borderRadius: "50%", background: "rgba(127,217,168,0.16)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--success)" }}>
+          <Icon name="whatsapp" size={15} />
+        </div>
+        <div>
+          <p style={{ fontSize: 13, fontWeight: 600 }}>Studio Glow</p>
+          <p style={{ fontSize: 11, color: "var(--text-2)" }}>agora</p>
+        </div>
+      </div>
+      <div style={{ background: "var(--bg-2)", borderRadius: 14, padding: "12px 14px", fontSize: 13, lineHeight: 1.5, color: "var(--text-1)" }}>
+        Oi, Camila! ✨ Lembrete do seu horário de <b style={{ color: "var(--text-0)" }}>Limpeza de pele</b> amanhã às <b style={{ color: "var(--text-0)" }}>14:00</b>. Te esperamos!
+      </div>
+      <p style={{ fontSize: 10.5, color: "var(--text-2)", textAlign: "right", marginTop: 6 }}>Enviado automaticamente ✓✓</p>
+    </div>
+  );
+}
+
+function Feature({ icon, title, body }) {
+  return (
+    <div className="card" style={{ height: "100%" }}>
+      <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(199,125,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--lilac)", marginBottom: 16 }}>
+        <Icon name={icon} size={20} />
+      </div>
+      <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>{title}</p>
+      <p style={{ fontSize: 14, color: "var(--text-2)", lineHeight: 1.6 }}>{body}</p>
+    </div>
+  );
+}
+
+function FeaturesSection() {
+  return (
+    <div id="recursos" className="container" style={{ padding: "70px 28px" }}>
+      <div style={{ textAlign: "center", marginBottom: 48 }}>
+        <p className="badge badge-gold" style={{ marginBottom: 16 }}>Tudo incluso, em todos os planos</p>
+        <h2 className="serif" style={{ fontSize: "clamp(26px,3.6vw,38px)", fontWeight: 500, marginBottom: 12 }}>Feito pra quem vive de agenda cheia</h2>
+        <p style={{ color: "var(--text-1)", maxWidth: 520, margin: "0 auto" }}>Sem planilha, sem caderninho, sem cliente que esquece do horário.</p>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 20, marginBottom: 56 }}>
+        <Feature icon="whatsapp" title="Lembrete automático no WhatsApp" body="Cliente recebe confirmação e lembrete antes do horário, sem você precisar digitar nada." />
+        <Feature icon="calendar" title="Link de agendamento próprio" body="Compartilhe seu link no Instagram e na bio. O cliente escolhe o horário sozinho, 24h por dia." />
+        <Feature icon="money" title="Histórico de pagamentos" body="Veja tudo o que já recebeu, organizado por cliente e por data, sem precisar de outro app." />
+        <Feature icon="users" title="Cadastro de clientes" body="Telefone, histórico de visitas e serviços preferidos, tudo num só lugar." />
+        <Feature icon="building" title="Sua marca, seu nome" body="Coloque o nome do seu studio na sua agenda. Seus clientes veem sua marca, não a nossa." />
+        <Feature icon="shield" title="Acesso seguro de qualquer lugar" body="Funciona no celular ou computador, sem precisar instalar nada." />
+      </div>
+      <div className="card" style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 36, alignItems: "center", padding: 40 }}>
+        <div>
+          <p className="badge badge-lilac" style={{ marginBottom: 16 }}><Icon name="whatsapp" size={13} /> Notificações automáticas</p>
+          <h3 className="serif" style={{ fontSize: 26, fontWeight: 500, marginBottom: 12 }}>Seus clientes nunca mais esquecem o horário</h3>
+          <p style={{ color: "var(--text-1)", lineHeight: 1.7, fontSize: 15 }}>
+            A cada novo agendamento, o Agenda Glow envia uma confirmação no WhatsApp do cliente. Um lembrete chega de novo perto da hora marcada. Menos faltas, mais horários ocupados.
+          </p>
+        </div>
+        <MiniPhoneMock />
+      </div>
+    </div>
+  );
+}
+
+function PlanCard({ plan, featured, onSelect }) {
+  const isMonthly = plan === "mensal";
+  return (
+    <div className="card" style={{
+      flex: 1, minWidth: 260, position: "relative",
+      border: featured ? "2px solid var(--lilac)" : "1px solid var(--line)",
+      background: featured ? "linear-gradient(160deg, rgba(199,125,255,0.07), var(--bg-card) 60%)" : "var(--bg-card)",
+    }}>
+      {featured && (
+        <div style={{ position: "absolute", top: -13, left: "50%", transform: "translateX(-50%)" }}>
+          <span className="badge badge-lilac" style={{ whiteSpace: "nowrap" }}><Icon name="star" size={12} /> Mais econômico</span>
+        </div>
+      )}
+      <p style={{ fontSize: 13, color: "var(--text-2)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: featured ? 8 : 0 }}>
+        Plano {isMonthly ? "mensal" : "anual"}
+      </p>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "14px 0 4px" }}>
+        <span className="serif" style={{ fontSize: 42, fontWeight: 500 }}>{fmtBRL(isMonthly ? PLAN_PRICES.mensal : PLAN_PRICES.anual / 12).replace(",00", "")}</span>
+        <span style={{ color: "var(--text-2)", fontSize: 14.5 }}>/mês</span>
+      </div>
+      <p style={{ fontSize: 13.5, color: "var(--text-2)", marginBottom: 22 }}>
+        {isMonthly ? "Cobrado mensalmente · cancele quando quiser" : `Cobrado ${fmtBRL(PLAN_PRICES.anual)} por ano · economize 2 meses`}
+      </p>
+      <button className={`btn btn-block ${featured ? "btn-primary" : "btn-ghost"}`} onClick={() => onSelect(plan)} style={{ marginBottom: 24 }}>
+        Assinar plano {isMonthly ? "mensal" : "anual"}
+      </button>
+      <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+        {["Agendamentos ilimitados", "Notificação automática no WhatsApp", "Histórico completo de pagamentos", "Link de agendamento personalizado", "Cadastro ilimitado de clientes", "Suporte por WhatsApp"].map((f, i) => (
+          <div key={i} style={{ display: "flex", gap: 9, fontSize: 13.5, color: "var(--text-1)" }}>
+            <span style={{ color: "var(--success)", flexShrink: 0 }}><Icon name="check" size={16} /></span>{f}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PlansSection({ onSelectPlan }) {
+  return (
+    <div id="planos" style={{ background: "var(--bg-1)", padding: "70px 0", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
+      <div className="container">
+        <div style={{ textAlign: "center", marginBottom: 44 }}>
+          <h2 className="serif" style={{ fontSize: "clamp(26px,3.6vw,38px)", fontWeight: 500, marginBottom: 12 }}>Preço justo pra quem está começando</h2>
+          <p style={{ color: "var(--text-1)" }}>Menos que uma unha de gel por mês. Escolha o plano e comece a agendar hoje.</p>
+        </div>
+        <div style={{ display: "flex", gap: 22, flexWrap: "wrap", maxWidth: 740, margin: "0 auto" }}>
+          <PlanCard plan="mensal" onSelect={onSelectPlan} />
+          <PlanCard plan="anual" featured onSelect={onSelectPlan} />
+        </div>
+        <div style={{ textAlign: "center", marginTop: 36 }}>
+          <p style={{ fontSize: 13.5, color: "var(--text-2)", marginBottom: 12 }}>Formas de pagamento aceitas</p>
+          <div style={{ display: "flex", gap: 18, justifyContent: "center", flexWrap: "wrap" }}>
+            {PAYMENT_METHODS.map(m => (
+              <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 7, color: "var(--text-1)", fontSize: 13.5 }}>
+                <Icon name={m.icon} size={16} /> {m.label}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FAQItem({ q, a }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ borderBottom: "1px solid var(--line)", padding: "18px 0" }}>
+      <button onClick={() => setOpen(!open)} style={{ background: "none", border: "none", width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", color: "var(--text-0)", textAlign: "left" }}>
+        <span style={{ fontSize: 15.5, fontWeight: 500 }}>{q}</span>
+        <span style={{ color: "var(--text-2)", transform: open ? "rotate(180deg)" : "none", transition: "transform .2s ease" }}><Icon name="chevronDown" size={18} /></span>
+      </button>
+      {open && <p style={{ marginTop: 12, fontSize: 14, color: "var(--text-1)", lineHeight: 1.7 }}>{a}</p>}
+    </div>
+  );
+}
+
+function FAQSection() {
+  const faqs = [
+    { q: "Como funciona o lembrete no WhatsApp?", a: "Toda vez que um cliente agenda um horário, o sistema envia automaticamente uma confirmação e, mais perto da data, um lembrete. Você não precisa fazer nada." },
+    { q: "Posso cancelar quando quiser?", a: "Sim. O plano mensal não tem fidelidade. No plano anual, o valor já vem com desconto, então o cancelamento segue as condições contratadas." },
+    { q: "Meus clientes acessam algum app?", a: "Não. Eles agendam direto pelo link do seu studio, no navegador do celular, sem precisar baixar nada." },
+    { q: "Posso usar o nome do meu studio?", a: "Sim. Ao criar sua conta, você escolhe o nome que aparece para os seus clientes — pode ser o nome do seu studio ou o seu próprio nome." },
+    { q: "Quais formas de pagamento posso oferecer?", a: "Você escolhe entre Pix, cartão de crédito e boleto para receber dos seus próprios clientes, e também para pagar sua assinatura do Agenda Glow." },
+  ];
+  return (
+    <div id="faq" className="container" style={{ padding: "70px 28px", maxWidth: 720 }}>
+      <h2 className="serif" style={{ fontSize: "clamp(24px,3.2vw,32px)", fontWeight: 500, marginBottom: 28, textAlign: "center" }}>Dúvidas frequentes</h2>
+      {faqs.map((f, i) => <FAQItem key={i} {...f} />)}
+    </div>
+  );
+}
+
+function FinalCTA({ onSignup }) {
+  return (
+    <div style={{ position: "relative", overflow: "hidden", padding: "80px 0", textAlign: "center" }}>
+      <div className="glow-ring" style={{ width: 500, height: 260, top: 0, left: "50%", transform: "translateX(-50%)", background: "var(--lilac-deep)" }} />
+      <div className="container" style={{ position: "relative", zIndex: 1 }}>
+        <h2 className="serif" style={{ fontSize: "clamp(26px,4vw,42px)", fontWeight: 500, marginBottom: 16 }}>Comece a vender mais horários hoje</h2>
+        <p style={{ color: "var(--text-1)", marginBottom: 30 }}>Crie sua agenda em menos de 2 minutos. Sem cartão de crédito pra testar.</p>
+        <button className="btn btn-primary" style={{ padding: "14px 30px", fontSize: 15.5 }} onClick={onSignup}>
+          Criar minha agenda gratuitamente <Icon name="arrowRight" size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Footer({ onAdminLogin }) {
+  return (
+    <div style={{ borderTop: "1px solid var(--line)", padding: "32px 0" }}>
+      <div className="container" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-2)", fontSize: 13.5 }}>
+          <Icon name="sparkle" size={14} /> Agenda Glow — © 2026
+        </div>
+        <button onClick={onAdminLogin} style={{ background: "none", border: "none", color: "var(--text-2)", fontSize: 12.5 }}>
+          Acesso administrativo
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function LandingPage({ onLogin, onSignup, onAdminLogin }) {
+  return (
+    <div>
+      <NavBar onLogin={onLogin} onSignup={onSignup} />
+      <Hero onSignup={onSignup} />
+      <FeaturesSection />
+      <PlansSection onSelectPlan={(plan) => onSignup(plan)} />
+      <FAQSection />
+      <FinalCTA onSignup={onSignup} />
+      <Footer onAdminLogin={onAdminLogin} />
+    </div>
+  );
+}
+
+/* ============================================================
+   AUTH SCREENS — signup with plan + payment, login, admin login
+   ============================================================ */
+function AuthShell({ children, onBack }) {
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, position: "relative" }}>
+      <div className="glow-ring" style={{ width: 420, height: 420, top: "-10%", left: "-8%", background: "var(--lilac-deep)" }} />
+      <div className="glow-ring" style={{ width: 380, height: 380, bottom: "-10%", right: "-8%", background: "var(--gold)" }} />
+      <button onClick={onBack} className="btn btn-ghost btn-sm" style={{ position: "absolute", top: 24, left: 24, zIndex: 2 }}>
+        <Icon name="chevronLeft" size={15} /> Voltar
+      </button>
+      <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: 460 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, marginBottom: 28 }}>
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: "linear-gradient(135deg, var(--lilac), var(--gold))", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Icon name="sparkle" size={15} color="#1A1420" />
+          </div>
+          <span className="serif" style={{ fontSize: 18, fontWeight: 600 }}>Agenda Glow</span>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function PlanPicker({ value, onChange }) {
+  return (
+    <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
+      {["mensal", "anual"].map(p => (
+        <button
+          key={p}
+          onClick={() => onChange(p)}
+          style={{
+            flex: 1, padding: "14px 12px", borderRadius: 12, textAlign: "left",
+            border: value === p ? "2px solid var(--lilac)" : "1px solid var(--line-strong)",
+            background: value === p ? "rgba(199,125,255,0.08)" : "var(--bg-1)",
+            position: "relative",
+          }}
+        >
+          {p === "anual" && <span className="badge badge-gold" style={{ position: "absolute", top: -10, right: 10, fontSize: 10.5, padding: "3px 8px" }}>-17%</span>}
+          <p style={{ fontSize: 12.5, color: "var(--text-2)", fontWeight: 600, textTransform: "uppercase" }}>{p === "mensal" ? "Mensal" : "Anual"}</p>
+          <p className="serif" style={{ fontSize: 21, fontWeight: 500, marginTop: 2 }}>
+            {fmtBRL(p === "mensal" ? PLAN_PRICES.mensal : PLAN_PRICES.anual / 12).replace(",00", "")}<span style={{ fontSize: 12, color: "var(--text-2)" }}>/mês</span>
+          </p>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PaymentPicker({ value, onChange }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 8 }}>
+      {PAYMENT_METHODS.map(m => (
+        <button
+          key={m.id}
+          onClick={() => onChange(m.id)}
+          style={{
+            display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 10,
+            border: value === m.id ? "2px solid var(--lilac)" : "1px solid var(--line-strong)",
+            background: value === m.id ? "rgba(199,125,255,0.06)" : "var(--bg-1)", textAlign: "left",
+          }}
+        >
+          <span style={{ color: value === m.id ? "var(--lilac)" : "var(--text-2)" }}><Icon name={m.icon} size={19} /></span>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 14, fontWeight: 500 }}>{m.label}</p>
+            <p style={{ fontSize: 12, color: "var(--text-2)" }}>{m.desc}</p>
+          </div>
+          {value === m.id && <span style={{ color: "var(--lilac)" }}><Icon name="check" size={17} /></span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function SignupScreen({ initialPlan, onBack, onComplete }) {
+  const [step, setStep] = useState(1);
+  const [studioName, setStudioName] = useState("");
+  const [ownerName, setOwnerName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [plan, setPlan] = useState(initialPlan || "mensal");
+  const [payMethod, setPayMethod] = useState("pix");
+  const [loading, setLoading] = useState(false);
+  const [showPw, setShowPw] = useState(false);
+
+  const canStep1 = studioName.trim().length >= 2 && ownerName.trim().length >= 2 && email.includes("@") && password.length >= 6;
+
+  const handleFinish = () => {
+    setLoading(true);
+    setTimeout(() => {
+      onComplete({ studioName, ownerName, email, password, plan, payMethod });
+    }, 900);
+  };
+
+  return (
+    <AuthShell onBack={onBack}>
+      <div className="card" style={{ padding: 32 }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
+          {[1, 2].map(s => (
+            <div key={s} style={{ flex: 1, height: 4, borderRadius: 4, background: step >= s ? "var(--lilac)" : "var(--bg-2)" }} />
+          ))}
+        </div>
+
+        {step === 1 && (
+          <>
+            <h2 className="serif" style={{ fontSize: 24, fontWeight: 500, marginBottom: 6 }}>Crie sua agenda</h2>
+            <p style={{ fontSize: 14, color: "var(--text-2)", marginBottom: 24 }}>Use o nome que seus clientes vão ver — pode ser o nome do seu studio ou o seu nome.</p>
+            <Field label="Nome do studio (ou seu nome)">
+              <input type="text" placeholder="Ex: Studio Camila Estética" value={studioName} onChange={e => setStudioName(e.target.value)} />
+            </Field>
+            <Field label="Seu nome completo">
+              <input type="text" placeholder="Seu nome" value={ownerName} onChange={e => setOwnerName(e.target.value)} />
+            </Field>
+            <Field label="E-mail">
+              <input type="email" placeholder="voce@email.com" value={email} onChange={e => setEmail(e.target.value)} />
+            </Field>
+            <Field label="Senha">
+              <div style={{ position: "relative" }}>
+                <input type={showPw ? "text" : "password"} placeholder="Mínimo 6 caracteres" value={password} onChange={e => setPassword(e.target.value)} style={{ paddingRight: 42 }} />
+                <button onClick={() => setShowPw(!showPw)} style={{ position: "absolute", right: 10, top: 9, background: "none", border: "none", color: "var(--text-2)" }} tabIndex={-1} aria-label={showPw ? "Ocultar senha" : "Mostrar senha"}>
+                  <Icon name={showPw ? "eyeOff" : "eye"} size={17} />
+                </button>
+              </div>
+            </Field>
+            <button className="btn btn-primary btn-block" disabled={!canStep1} style={{ opacity: canStep1 ? 1 : 0.5, marginTop: 8 }} onClick={() => setStep(2)}>
+              Continuar <Icon name="arrowRight" size={15} />
+            </button>
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            <h2 className="serif" style={{ fontSize: 24, fontWeight: 500, marginBottom: 6 }}>Escolha seu plano</h2>
+            <p style={{ fontSize: 14, color: "var(--text-2)", marginBottom: 20 }}>Sem fidelidade no mensal. Cancele quando quiser.</p>
+            <PlanPicker value={plan} onChange={setPlan} />
+            <label style={{ marginTop: 4 }}>Forma de pagamento</label>
+            <PaymentPicker value={payMethod} onChange={setPayMethod} />
+            <div className="card" style={{ background: "var(--bg-1)", padding: 16, margin: "18px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <p style={{ fontSize: 13, color: "var(--text-2)" }}>Total {plan === "anual" ? "por ano" : "por mês"}</p>
+                <p className="serif" style={{ fontSize: 22, fontWeight: 500 }}>{fmtBRL(plan === "anual" ? PLAN_PRICES.anual : PLAN_PRICES.mensal)}</p>
+              </div>
+              <span className="badge badge-success"><Icon name="shield" size={12} /> Pagamento seguro</span>
+            </div>
+            <button className="btn btn-primary btn-block" onClick={handleFinish} disabled={loading} style={{ opacity: loading ? 0.7 : 1 }}>
+              {loading ? "Confirmando assinatura..." : `Assinar e criar minha agenda`}
+            </button>
+            <button className="btn btn-ghost btn-block" style={{ marginTop: 10 }} onClick={() => setStep(1)}>Voltar</button>
+          </>
+        )}
+      </div>
+    </AuthShell>
+  );
+}
+
+function LoginScreen({ onBack, onLogin, onForgot, role }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = () => {
+    const ok = onLogin(email.trim(), password);
+    if (!ok) setError("E-mail ou senha incorretos.");
+  };
+
+  return (
+    <AuthShell onBack={onBack}>
+      <div className="card" style={{ padding: 32 }}>
+        <h2 className="serif" style={{ fontSize: 24, fontWeight: 500, marginBottom: 6 }}>
+          {role === "admin" ? "Acesso administrativo" : "Entrar na sua agenda"}
+        </h2>
+        <p style={{ fontSize: 14, color: "var(--text-2)", marginBottom: 24 }}>
+          {role === "admin" ? "Painel restrito ao administrador do Agenda Glow." : "Acesse o painel do seu studio."}
+        </p>
+        {error && <div className="badge badge-danger" style={{ marginBottom: 16, display: "flex" }}>{error}</div>}
+        <Field label="E-mail">
+          <input type="email" placeholder="voce@email.com" value={email} onChange={e => { setEmail(e.target.value); setError(""); }} />
+        </Field>
+        <Field label="Senha">
+          <div style={{ position: "relative" }}>
+            <input type={showPw ? "text" : "password"} placeholder="Sua senha" value={password} onChange={e => { setPassword(e.target.value); setError(""); }} style={{ paddingRight: 42 }} onKeyDown={e => e.key === "Enter" && submit()} />
+            <button onClick={() => setShowPw(!showPw)} style={{ position: "absolute", right: 10, top: 9, background: "none", border: "none", color: "var(--text-2)" }} tabIndex={-1} aria-label={showPw ? "Ocultar senha" : "Mostrar senha"}>
+              <Icon name={showPw ? "eyeOff" : "eye"} size={17} />
+            </button>
+          </div>
+        </Field>
+        <button className="btn btn-primary btn-block" onClick={submit} style={{ marginTop: 8 }}>Entrar</button>
+        {role !== "admin" && (
+          <p style={{ fontSize: 13, color: "var(--text-2)", textAlign: "center", marginTop: 16 }}>
+            Use <b style={{ color: "var(--text-1)" }}>mariana@exemplo.com</b> / <b style={{ color: "var(--text-1)" }}>123456</b> para testar a demonstração.
+          </p>
+        )}
+        {role === "admin" && (
+          <p style={{ fontSize: 13, color: "var(--text-2)", textAlign: "center", marginTop: 16 }}>
+            Use seu e-mail e senha de administrador para entrar.
+          </p>
+        )}
+      </div>
+    </AuthShell>
+  );
+}
+
+/* ============================================================
+   STUDIO DASHBOARD — the paying customer's app
+   ============================================================ */
+function StudioSidebar({ active, setActive, studio, onLogout, mobileOpen, setMobileOpen }) {
+  const items = [
+    { id: "agenda", label: "Agenda", icon: "calendar" },
+    { id: "clientes", label: "Clientes", icon: "users" },
+    { id: "servicos", label: "Serviços", icon: "scissors" },
+    { id: "pagamentos", label: "Histórico de pagamentos", icon: "money" },
+    { id: "config", label: "Configurações", icon: "settings" },
+  ];
+  return (
+    <>
+      {mobileOpen && <div onClick={() => setMobileOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 39 }} />}
+      <div style={{
+        width: 250, background: "var(--bg-1)", borderRight: "1px solid var(--line)", padding: 20,
+        display: "flex", flexDirection: "column", height: "100vh", position: "fixed", top: 0, left: 0, zIndex: 40,
+        transform: mobileOpen ? "translateX(0)" : undefined, transition: "transform .2s ease",
+      }} className={mobileOpen ? "" : "sidebar-desktop"}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 28, padding: "0 6px" }}>
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: "linear-gradient(135deg, var(--lilac), var(--gold))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Icon name="sparkle" size={15} color="#1A1420" />
+          </div>
+          <span className="serif" style={{ fontSize: 17, fontWeight: 600 }}>Agenda Glow</span>
+        </div>
+        <div className="card" style={{ padding: 12, marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
+          <Avatar name={studio.name} size={36} tone="gold" />
+          <div style={{ overflow: "hidden" }}>
+            <p style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{studio.name}</p>
+            <p style={{ fontSize: 11.5, color: "var(--text-2)" }}>Plano {studio.plan === "anual" ? "anual" : "mensal"}</p>
+          </div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1 }}>
+          {items.map(it => (
+            <button key={it.id} onClick={() => { setActive(it.id); setMobileOpen(false); }} className={`sidebar-link ${active === it.id ? "active" : ""}`} style={{ background: "none", border: "none", width: "100%", textAlign: "left" }}>
+              <Icon name={it.icon} size={18} /> {it.label}
+            </button>
+          ))}
+        </div>
+        <button onClick={onLogout} className="sidebar-link" style={{ background: "none", border: "none", width: "100%", textAlign: "left" }}>
+          <Icon name="logout" size={18} /> Sair
+        </button>
+      </div>
+    </>
+  );
+}
+
+function TopBar({ title, onMenu, right }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 26, gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <button className="menu-toggle btn btn-ghost btn-sm" onClick={onMenu} style={{ display: "none", padding: 8 }} aria-label="Abrir menu">
+          <Icon name="menu" size={18} />
+        </button>
+        <h1 className="serif" style={{ fontSize: 25, fontWeight: 500 }}>{title}</h1>
+      </div>
+      {right}
+    </div>
+  );
+}
+
+function StatCard({ icon, label, value, tone = "lilac" }) {
+  const color = tone === "lilac" ? "var(--lilac)" : tone === "gold" ? "var(--gold)" : tone === "success" ? "var(--success)" : "var(--text-1)";
+  return (
+    <div className="card" style={{ flex: 1, minWidth: 150 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-2)", fontSize: 13, marginBottom: 10 }}>
+        <span style={{ color }}><Icon name={icon} size={16} /></span>{label}
+      </div>
+      <p className="serif" style={{ fontSize: 26, fontWeight: 500 }}>{value}</p>
+    </div>
+  );
+}
+
+/* ---------- Agenda tab ---------- */
+function AppointmentModal({ studio, onClose, onSave, editing }) {
+  const [clientId, setClientId] = useState(editing?.clientId || studio.clients[0]?.id || "");
+  const [serviceId, setServiceId] = useState(editing?.serviceId || studio.services[0]?.id || "");
+  const [date, setDate] = useState(editing?.date || todayISO());
+  const [time, setTime] = useState(editing?.time || "09:00");
+  const [status, setStatus] = useState(editing?.status || "confirmado");
+  const [notify, setNotify] = useState(true);
+
+  const canSave = clientId && serviceId && date && time;
+
+  return (
+    <Modal onClose={onClose}>
+      <ModalHeader title={editing ? "Editar agendamento" : "Novo agendamento"} onClose={onClose} />
+      <Field label="Cliente">
+        <select value={clientId} onChange={e => setClientId(e.target.value)}>
+          {studio.clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </Field>
+      <Field label="Serviço">
+        <select value={serviceId} onChange={e => setServiceId(e.target.value)}>
+          {studio.services.map(s => <option key={s.id} value={s.id}>{s.name} — {fmtBRL(s.price)}</option>)}
+        </select>
+      </Field>
+      <div style={{ display: "flex", gap: 12 }}>
+        <Field label="Data"><input type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>
+        <Field label="Horário"><input type="time" value={time} onChange={e => setTime(e.target.value)} /></Field>
+      </div>
+      <Field label="Status">
+        <select value={status} onChange={e => setStatus(e.target.value)}>
+          <option value="confirmado">Confirmado</option>
+          <option value="pendente">Pendente</option>
+          <option value="concluido">Concluído</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+      </Field>
+      <div className="card" style={{ background: "var(--bg-1)", padding: 14, marginBottom: 20 }}>
+        <ToggleSwitch checked={notify} onChange={setNotify} label="Notificar cliente no WhatsApp" sub="Envia confirmação automática do horário" />
+      </div>
+      <button className="btn btn-primary btn-block" disabled={!canSave} style={{ opacity: canSave ? 1 : 0.5 }} onClick={() => onSave({ clientId, serviceId, date, time, status, notify })}>
+        {editing ? "Salvar alterações" : "Criar agendamento"}
+      </button>
+    </Modal>
+  );
+}
+
+function AgendaTab({ studio, updateStudio, onMenu }) {
+  const toast = useToast();
+  const [selectedDate, setSelectedDate] = useState(todayISO());
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+
+  const days = Array.from({ length: 7 }, (_, i) => addDays(todayISO(), i));
+  const dayAppts = studio.appointments.filter(a => a.date === selectedDate).sort((a, b) => a.time.localeCompare(b.time));
+
+  const getClient = (id) => studio.clients.find(c => c.id === id);
+  const getService = (id) => studio.services.find(s => s.id === id);
+
+  const saveAppt = (data) => {
+    let appts;
+    if (editing) {
+      appts = studio.appointments.map(a => a.id === editing.id ? { ...a, ...data } : a);
+      toast("Agendamento atualizado");
+    } else {
+      appts = [...studio.appointments, { id: uid("apt"), ...data }];
+      toast(data.notify ? "Agendamento criado e cliente notificado no WhatsApp" : "Agendamento criado");
+    }
+    updateStudio({ ...studio, appointments: appts });
+    setModalOpen(false);
+    setEditing(null);
+  };
+
+  const removeAppt = (id) => {
+    updateStudio({ ...studio, appointments: studio.appointments.filter(a => a.id !== id) });
+    toast("Agendamento removido", "info");
+  };
+
+  return (
+    <div>
+      <TopBar title="Agenda" onMenu={onMenu} right={
+        <button className="btn btn-primary btn-sm" onClick={() => { setEditing(null); setModalOpen(true); }}>
+          <Icon name="plus" size={15} /> Novo agendamento
+        </button>
+      } />
+
+      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginBottom: 22 }}>
+        {days.map(d => (
+          <button key={d} onClick={() => setSelectedDate(d)} style={{
+            flexShrink: 0, minWidth: 72, padding: "10px 6px", borderRadius: 12, textAlign: "center",
+            border: selectedDate === d ? "2px solid var(--lilac)" : "1px solid var(--line-strong)",
+            background: selectedDate === d ? "rgba(199,125,255,0.08)" : "var(--bg-1)",
+          }}>
+            <p style={{ fontSize: 11, color: "var(--text-2)", textTransform: "uppercase" }}>{fmtDateLong(d).split(" ")[0].replace(".", "")}</p>
+            <p style={{ fontSize: 17, fontWeight: 600, marginTop: 2 }}>{d.slice(8, 10)}</p>
+            {d === todayISO() && <span style={{ fontSize: 9.5, color: "var(--lilac)" }}>hoje</span>}
+          </button>
+        ))}
+      </div>
+
+      {dayAppts.length === 0 ? (
+        <EmptyState icon="calendar" title="Nenhum horário neste dia" body="Crie um novo agendamento ou compartilhe seu link para que clientes marquem direto." action={
+          <button className="btn btn-primary" onClick={() => setModalOpen(true)}><Icon name="plus" size={15} /> Novo agendamento</button>
+        } />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {dayAppts.map(a => {
+            const client = getClient(a.clientId), service = getService(a.serviceId);
+            return (
+              <div key={a.id} className="card" style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                <div style={{ textAlign: "center", minWidth: 54 }}>
+                  <p className="serif" style={{ fontSize: 18, fontWeight: 500 }}>{a.time}</p>
+                </div>
+                <Avatar name={client?.name || "?"} size={40} />
+                <div style={{ flex: 1, minWidth: 140 }}>
+                  <p style={{ fontWeight: 600, fontSize: 14.5 }}>{client?.name}</p>
+                  <p style={{ fontSize: 13, color: "var(--text-2)" }}>{service?.name} · {fmtBRL(service?.price || 0)}</p>
+                </div>
+                <StatusBadge status={a.status} />
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button className="btn btn-ghost btn-sm" style={{ padding: 8 }} onClick={() => { setEditing(a); setModalOpen(true); }} aria-label="Editar"><Icon name="edit" size={15} /></button>
+                  <button className="btn btn-ghost btn-sm" style={{ padding: 8, color: "var(--danger)" }} onClick={() => removeAppt(a.id)} aria-label="Excluir"><Icon name="trash" size={15} /></button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {modalOpen && <AppointmentModal studio={studio} editing={editing} onClose={() => { setModalOpen(false); setEditing(null); }} onSave={saveAppt} />}
+    </div>
+  );
+}
+
+/* ---------- Clients tab ---------- */
+function ClientModal({ onClose, onSave, editing }) {
+  const [name, setName] = useState(editing?.name || "");
+  const [phone, setPhone] = useState(editing?.phone || "");
+  const canSave = name.trim().length >= 2 && phone.trim().length >= 8;
+  return (
+    <Modal onClose={onClose}>
+      <ModalHeader title={editing ? "Editar cliente" : "Novo cliente"} onClose={onClose} />
+      <Field label="Nome completo"><input type="text" placeholder="Nome do cliente" value={name} onChange={e => setName(e.target.value)} /></Field>
+      <Field label="WhatsApp"><input type="tel" placeholder="11 99999-0000" value={phone} onChange={e => setPhone(e.target.value)} /></Field>
+      <button className="btn btn-primary btn-block" disabled={!canSave} style={{ opacity: canSave ? 1 : 0.5 }} onClick={() => onSave({ name, phone })}>Salvar cliente</button>
+    </Modal>
+  );
+}
+
+function ClientsTab({ studio, updateStudio, onMenu }) {
+  const toast = useToast();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [search, setSearch] = useState("");
+
+  const filtered = studio.clients.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
+
+  const save = (data) => {
+    let clients;
+    if (editing) { clients = studio.clients.map(c => c.id === editing.id ? { ...c, ...data } : c); toast("Cliente atualizado"); }
+    else { clients = [...studio.clients, { id: uid("cli"), ...data }]; toast("Cliente cadastrado"); }
+    updateStudio({ ...studio, clients });
+    setModalOpen(false); setEditing(null);
+  };
+
+  const remove = (id) => {
+    updateStudio({ ...studio, clients: studio.clients.filter(c => c.id !== id) });
+    toast("Cliente removido", "info");
+  };
+
+  const visitsCount = (clientId) => studio.appointments.filter(a => a.clientId === clientId && a.status === "concluido").length;
+
+  return (
+    <div>
+      <TopBar title="Clientes" onMenu={onMenu} right={
+        <button className="btn btn-primary btn-sm" onClick={() => { setEditing(null); setModalOpen(true); }}><Icon name="plus" size={15} /> Novo cliente</button>
+      } />
+      <div style={{ marginBottom: 18, maxWidth: 320 }}>
+        <input type="text" placeholder="Buscar cliente..." value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+      {filtered.length === 0 ? (
+        <EmptyState icon="users" title="Nenhum cliente encontrado" body="Cadastre clientes para agendar horários e enviar notificações no WhatsApp." action={
+          <button className="btn btn-primary" onClick={() => setModalOpen(true)}><Icon name="plus" size={15} /> Novo cliente</button>
+        } />
+      ) : (
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <table>
+            <thead><tr><th>Cliente</th><th>WhatsApp</th><th>Visitas concluídas</th><th></th></tr></thead>
+            <tbody>
+              {filtered.map(c => (
+                <tr key={c.id}>
+                  <td><div style={{ display: "flex", alignItems: "center", gap: 10 }}><Avatar name={c.name} size={32} /> {c.name}</div></td>
+                  <td style={{ color: "var(--text-1)" }}><Icon name="whatsapp" size={13} style={{ marginRight: 6, color: "var(--success)" }} />{c.phone}</td>
+                  <td>{visitsCount(c.id)}</td>
+                  <td>
+                    <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                      <button className="btn btn-ghost btn-sm" style={{ padding: 7 }} onClick={() => { setEditing(c); setModalOpen(true); }} aria-label="Editar"><Icon name="edit" size={14} /></button>
+                      <button className="btn btn-ghost btn-sm" style={{ padding: 7, color: "var(--danger)" }} onClick={() => remove(c.id)} aria-label="Excluir"><Icon name="trash" size={14} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {modalOpen && <ClientModal editing={editing} onClose={() => { setModalOpen(false); setEditing(null); }} onSave={save} />}
+    </div>
+  );
+}
+
+/* ---------- Services tab ---------- */
+function ServiceModal({ onClose, onSave, editing }) {
+  const [name, setName] = useState(editing?.name || "");
+  const [duration, setDuration] = useState(editing?.duration || 60);
+  const [price, setPrice] = useState(editing?.price || 100);
+  const canSave = name.trim().length >= 2 && duration > 0 && price >= 0;
+  return (
+    <Modal onClose={onClose}>
+      <ModalHeader title={editing ? "Editar serviço" : "Novo serviço"} onClose={onClose} />
+      <Field label="Nome do serviço"><input type="text" placeholder="Ex: Limpeza de pele" value={name} onChange={e => setName(e.target.value)} /></Field>
+      <div style={{ display: "flex", gap: 12 }}>
+        <Field label="Duração (minutos)"><input type="number" min="10" step="5" value={duration} onChange={e => setDuration(Number(e.target.value))} /></Field>
+        <Field label="Preço (R$)"><input type="number" min="0" step="5" value={price} onChange={e => setPrice(Number(e.target.value))} /></Field>
+      </div>
+      <button className="btn btn-primary btn-block" disabled={!canSave} style={{ opacity: canSave ? 1 : 0.5 }} onClick={() => onSave({ name, duration, price })}>Salvar serviço</button>
+    </Modal>
+  );
+}
+
+function ServicesTab({ studio, updateStudio, onMenu }) {
+  const toast = useToast();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+
+  const save = (data) => {
+    let services;
+    if (editing) { services = studio.services.map(s => s.id === editing.id ? { ...s, ...data } : s); toast("Serviço atualizado"); }
+    else { services = [...studio.services, { id: uid("srv"), ...data }]; toast("Serviço cadastrado"); }
+    updateStudio({ ...studio, services });
+    setModalOpen(false); setEditing(null);
+  };
+  const remove = (id) => { updateStudio({ ...studio, services: studio.services.filter(s => s.id !== id) }); toast("Serviço removido", "info"); };
+
+  return (
+    <div>
+      <TopBar title="Serviços" onMenu={onMenu} right={
+        <button className="btn btn-primary btn-sm" onClick={() => { setEditing(null); setModalOpen(true); }}><Icon name="plus" size={15} /> Novo serviço</button>
+      } />
+      {studio.services.length === 0 ? (
+        <EmptyState icon="scissors" title="Nenhum serviço cadastrado" body="Cadastre os serviços que seu studio oferece para começar a receber agendamentos." action={
+          <button className="btn btn-primary" onClick={() => setModalOpen(true)}><Icon name="plus" size={15} /> Novo serviço</button>
+        } />
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
+          {studio.services.map(s => (
+            <div key={s.id} className="card">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(232,196,160,0.14)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)" }}>
+                  <Icon name="scissors" size={17} />
+                </div>
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button className="btn btn-ghost btn-sm" style={{ padding: 6 }} onClick={() => { setEditing(s); setModalOpen(true); }} aria-label="Editar"><Icon name="edit" size={13} /></button>
+                  <button className="btn btn-ghost btn-sm" style={{ padding: 6, color: "var(--danger)" }} onClick={() => remove(s.id)} aria-label="Excluir"><Icon name="trash" size={13} /></button>
+                </div>
+              </div>
+              <p style={{ fontWeight: 600, fontSize: 15.5, marginTop: 14 }}>{s.name}</p>
+              <div style={{ display: "flex", gap: 14, marginTop: 8, fontSize: 13, color: "var(--text-2)" }}>
+                <span><Icon name="clock" size={13} style={{ marginRight: 4 }} />{s.duration} min</span>
+                <span style={{ color: "var(--gold)", fontWeight: 600 }}>{fmtBRL(s.price)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {modalOpen && <ServiceModal editing={editing} onClose={() => { setModalOpen(false); setEditing(null); }} onSave={save} />}
+    </div>
+  );
+}
+
+/* ---------- Payments history tab ---------- */
+function PaymentsTab({ studio, onMenu }) {
+  const totalReceived = studio.payments.filter(p => p.status === "pago").reduce((s, p) => s + p.amount, 0);
+  const thisMonth = studio.payments.filter(p => p.status === "pago" && p.date.slice(0, 7) === todayISO().slice(0, 7)).reduce((s, p) => s + p.amount, 0);
+
+  return (
+    <div>
+      <TopBar title="Histórico de pagamentos" onMenu={onMenu} />
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
+        <StatCard icon="money" label="Total recebido" value={fmtBRL(totalReceived)} tone="success" />
+        <StatCard icon="chart" label="Recebido este mês" value={fmtBRL(thisMonth)} tone="gold" />
+        <StatCard icon="calendar" label="Próxima cobrança da assinatura" value={fmtDate(studio.nextBilling)} tone="lilac" />
+      </div>
+      {studio.payments.length === 0 ? (
+        <EmptyState icon="money" title="Nenhum pagamento registrado" body="Seu histórico de pagamentos da assinatura aparecerá aqui." />
+      ) : (
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <table>
+            <thead><tr><th>Descrição</th><th>Data</th><th>Forma</th><th>Status</th><th style={{ textAlign: "right" }}>Valor</th></tr></thead>
+            <tbody>
+              {studio.payments.slice().sort((a, b) => b.date.localeCompare(a.date)).map(p => (
+                <tr key={p.id}>
+                  <td>{p.label}</td>
+                  <td style={{ color: "var(--text-2)" }}>{fmtDate(p.date)}</td>
+                  <td><span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--text-1)" }}><Icon name={PAYMENT_METHODS.find(m => m.id === p.method)?.icon || "money"} size={14} />{PAYMENT_METHODS.find(m => m.id === p.method)?.label || p.method}</span></td>
+                  <td><StatusBadge status={p.status} /></td>
+                  <td style={{ textAlign: "right", fontWeight: 600 }}>{fmtBRL(p.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Settings tab ---------- */
+function ConfigTab({ studio, updateStudio, onMenu }) {
+  const toast = useToast();
+  const [name, setName] = useState(studio.name);
+  const [whatsapp, setWhatsapp] = useState(studio.whatsappNumber);
+  const [notif, setNotif] = useState(studio.whatsappNotifications);
+  const publicLink = `agendaglow.app/${studio.slug}`;
+
+  const save = () => {
+    updateStudio({ ...studio, name, whatsappNumber: whatsapp, whatsappNotifications: notif });
+    toast("Configurações salvas");
+  };
+
+  const copyLink = () => {
+    toast("Link copiado para a área de transferência", "info");
+  };
+
+  return (
+    <div>
+      <TopBar title="Configurações" onMenu={onMenu} />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 18, maxWidth: 560 }}>
+        <div className="card">
+          <p style={{ fontWeight: 600, marginBottom: 16 }}>Dados do studio</p>
+          <Field label="Nome exibido para clientes"><input type="text" value={name} onChange={e => setName(e.target.value)} /></Field>
+          <div>
+            <label>Seu link de agendamento</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input type="text" readOnly value={publicLink} style={{ color: "var(--text-2)" }} />
+              <button className="btn btn-ghost" onClick={copyLink} aria-label="Copiar link"><Icon name="copy" size={16} /></button>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <p style={{ fontWeight: 600, marginBottom: 16 }}><Icon name="whatsapp" size={16} style={{ marginRight: 6, color: "var(--success)" }} />Notificações no WhatsApp</p>
+          <Field label="Número do WhatsApp do studio"><input type="tel" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} /></Field>
+          <div className="card" style={{ background: "var(--bg-1)", padding: 14 }}>
+            <ToggleSwitch checked={notif} onChange={setNotif} label="Enviar confirmação e lembrete automático" sub="Cliente recebe mensagem ao agendar e antes do horário" />
+          </div>
+        </div>
+
+        <div className="card">
+          <p style={{ fontWeight: 600, marginBottom: 4 }}>Sua assinatura</p>
+          <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 16 }}>Gerencie seu plano do Agenda Glow</p>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <span style={{ fontSize: 14, color: "var(--text-1)" }}>Plano atual</span>
+            <span className="badge badge-lilac">{studio.plan === "anual" ? "Anual" : "Mensal"}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <span style={{ fontSize: 14, color: "var(--text-1)" }}>Valor</span>
+            <span style={{ fontWeight: 600 }}>{fmtBRL(studio.plan === "anual" ? PLAN_PRICES.anual : PLAN_PRICES.mensal)}{studio.plan === "anual" ? "/ano" : "/mês"}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 14, color: "var(--text-1)" }}>Próxima cobrança</span>
+            <span style={{ fontWeight: 600 }}>{fmtDate(studio.nextBilling)}</span>
+          </div>
+        </div>
+
+        <button className="btn btn-primary" onClick={save}>Salvar alterações</button>
+      </div>
+    </div>
+  );
+}
+
+function StudioApp({ studio, setStudio, onLogout }) {
+  const [active, setActive] = useState("agenda");
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const updateStudio = (next) => setStudio(next);
+
+  const tabs = {
+    agenda: <AgendaTab studio={studio} updateStudio={updateStudio} onMenu={() => setMobileOpen(true)} />,
+    clientes: <ClientsTab studio={studio} updateStudio={updateStudio} onMenu={() => setMobileOpen(true)} />,
+    servicos: <ServicesTab studio={studio} updateStudio={updateStudio} onMenu={() => setMobileOpen(true)} />,
+    pagamentos: <PaymentsTab studio={studio} onMenu={() => setMobileOpen(true)} />,
+    config: <ConfigTab studio={studio} updateStudio={updateStudio} onMenu={() => setMobileOpen(true)} />,
+  };
+
+  return (
+    <div style={{ display: "flex" }}>
+      <StudioSidebar active={active} setActive={setActive} studio={studio} onLogout={onLogout} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+      <div className="main-content" style={{ flex: 1, marginLeft: 250, padding: "28px 32px", minHeight: "100vh" }}>
+        {tabs[active]}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   ADMIN DASHBOARD — platform owner's view across all studios
+   ============================================================ */
+function AdminSidebar({ active, setActive, onLogout, mobileOpen, setMobileOpen }) {
+  const items = [
+    { id: "visao", label: "Visão geral", icon: "chart" },
+    { id: "studios", label: "Studios assinantes", icon: "building" },
+    { id: "acesso", label: "Acessos gratuitos", icon: "star" },
+    { id: "planos", label: "Planos e preços", icon: "crown" },
+    { id: "pagamentos", label: "Pagamentos recebidos", icon: "money" },
+  ];
+  return (
+    <>
+      {mobileOpen && <div onClick={() => setMobileOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 39 }} />}
+      <div style={{
+        width: 250, background: "var(--bg-1)", borderRight: "1px solid var(--line)", padding: 20,
+        display: "flex", flexDirection: "column", height: "100vh", position: "fixed", top: 0, left: 0, zIndex: 40,
+        transform: mobileOpen ? "translateX(0)" : undefined, transition: "transform .2s ease",
+      }} className={mobileOpen ? "" : "sidebar-desktop"}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10, padding: "0 6px" }}>
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: "linear-gradient(135deg, var(--lilac), var(--gold))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Icon name="sparkle" size={15} color="#1A1420" />
+          </div>
+          <span className="serif" style={{ fontSize: 17, fontWeight: 600 }}>Agenda Glow</span>
+        </div>
+        <p className="badge badge-gold" style={{ alignSelf: "flex-start", marginBottom: 20 }}><Icon name="crown" size={12} /> Admin</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1 }}>
+          {items.map(it => (
+            <button key={it.id} onClick={() => { setActive(it.id); setMobileOpen(false); }} className={`sidebar-link ${active === it.id ? "active" : ""}`} style={{ background: "none", border: "none", width: "100%", textAlign: "left" }}>
+              <Icon name={it.icon} size={18} /> {it.label}
+            </button>
+          ))}
+        </div>
+        <button onClick={onLogout} className="sidebar-link" style={{ background: "none", border: "none", width: "100%", textAlign: "left" }}>
+          <Icon name="logout" size={18} /> Sair
+        </button>
+      </div>
+    </>
+  );
+}
+
+function platformStats(studios) {
+  const active = studios.filter(s => s.planStatus === "ativo");
+  const mrr = active.reduce((sum, s) => sum + (s.plan === "anual" ? PLAN_PRICES.anual / 12 : PLAN_PRICES.mensal), 0);
+  const annualCount = active.filter(s => s.plan === "anual").length;
+  const monthlyCount = active.filter(s => s.plan === "mensal").length;
+  const totalRevenue = studios.reduce((sum, s) => sum + s.payments.filter(p => p.status === "pago").reduce((a, p) => a + p.amount, 0), 0);
+  return { active: active.length, mrr, annualCount, monthlyCount, totalRevenue, total: studios.length };
+}
+
+function AdminOverview({ studios, onMenu }) {
+  const stats = platformStats(studios);
+  const recentStudios = studios.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5);
+  return (
+    <div>
+      <TopBar title="Visão geral da plataforma" onMenu={onMenu} />
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 26 }}>
+        <StatCard icon="building" label="Studios ativos" value={stats.active} tone="lilac" />
+        <StatCard icon="chart" label="Receita mensal recorrente" value={fmtBRL(stats.mrr)} tone="success" />
+        <StatCard icon="crown" label="Assinantes do plano anual" value={stats.annualCount} tone="gold" />
+        <StatCard icon="money" label="Receita total já recebida" value={fmtBRL(stats.totalRevenue)} tone="lilac" />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 18 }} className="admin-grid">
+        <div className="card">
+          <p style={{ fontWeight: 600, marginBottom: 16 }}>Studios cadastrados recentemente</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {recentStudios.map(s => (
+              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid var(--line)" }}>
+                <Avatar name={s.name} size={36} />
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontWeight: 500, fontSize: 14 }}>{s.name}</p>
+                  <p style={{ fontSize: 12.5, color: "var(--text-2)" }}>{s.owner.email} · desde {fmtDate(s.createdAt)}</p>
+                </div>
+                <span className="badge badge-lilac">{s.plan === "anual" ? "Anual" : "Mensal"}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="card">
+          <p style={{ fontWeight: 600, marginBottom: 16 }}>Distribuição de planos</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, marginBottom: 6 }}>
+                <span>Mensal · {fmtBRL(PLAN_PRICES.mensal)}</span><span>{stats.monthlyCount} studios</span>
+              </div>
+              <div style={{ height: 8, borderRadius: 8, background: "var(--bg-2)", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${stats.total ? (stats.monthlyCount / stats.total) * 100 : 0}%`, background: "var(--gold)" }} />
+              </div>
+            </div>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, marginBottom: 6 }}>
+                <span>Anual · {fmtBRL(PLAN_PRICES.anual)}</span><span>{stats.annualCount} studios</span>
+              </div>
+              <div style={{ height: 8, borderRadius: 8, background: "var(--bg-2)", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${stats.total ? (stats.annualCount / stats.total) * 100 : 0}%`, background: "var(--lilac)" }} />
+              </div>
+            </div>
+          </div>
+          <div className="card" style={{ background: "var(--bg-1)", marginTop: 18, padding: 14 }}>
+            <p style={{ fontSize: 13, color: "var(--text-2)" }}>Ticket médio por studio / mês</p>
+            <p className="serif" style={{ fontSize: 22, fontWeight: 500, marginTop: 4 }}>{fmtBRL(stats.total ? stats.mrr / stats.active : 0)}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StudioDetailModal({ studio, onClose, onChangeStatus }) {
+  const totalRevenue = studio.payments.filter(p => p.status === "pago").reduce((a, p) => a + p.amount, 0);
+  return (
+    <Modal onClose={onClose} width={560}>
+      <ModalHeader title={studio.name} onClose={onClose} />
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+        <Avatar name={studio.name} size={48} tone="gold" />
+        <div>
+          <p style={{ fontWeight: 600 }}>{studio.owner.name}</p>
+          <p style={{ fontSize: 13, color: "var(--text-2)" }}>{studio.owner.email}</p>
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+        <span className="badge badge-lilac">Plano {studio.plan === "anual" ? "anual" : "mensal"}</span>
+        <StatusBadge status={studio.planStatus} />
+        <span className="badge badge-gray">Link: agendaglow.app/{studio.slug}</span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+        <div className="card" style={{ background: "var(--bg-1)" }}>
+          <p style={{ fontSize: 12.5, color: "var(--text-2)" }}>Clientes cadastrados</p>
+          <p className="serif" style={{ fontSize: 20, fontWeight: 500 }}>{studio.clients.length}</p>
+        </div>
+        <div className="card" style={{ background: "var(--bg-1)" }}>
+          <p style={{ fontSize: 12.5, color: "var(--text-2)" }}>Total pago à plataforma</p>
+          <p className="serif" style={{ fontSize: 20, fontWeight: 500 }}>{fmtBRL(totalRevenue)}</p>
+        </div>
+        <div className="card" style={{ background: "var(--bg-1)" }}>
+          <p style={{ fontSize: 12.5, color: "var(--text-2)" }}>Cliente desde</p>
+          <p className="serif" style={{ fontSize: 20, fontWeight: 500 }}>{fmtDate(studio.createdAt)}</p>
+        </div>
+        <div className="card" style={{ background: "var(--bg-1)" }}>
+          <p style={{ fontSize: 12.5, color: "var(--text-2)" }}>Próxima cobrança</p>
+          <p className="serif" style={{ fontSize: 20, fontWeight: 500 }}>{fmtDate(studio.nextBilling)}</p>
+        </div>
+      </div>
+      <p style={{ fontWeight: 600, marginBottom: 10, fontSize: 14 }}>Pagamentos da assinatura</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20, maxHeight: 160, overflowY: "auto" }}>
+        {studio.payments.map(p => (
+          <div key={p.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, padding: "8px 0", borderBottom: "1px solid var(--line)" }}>
+            <span style={{ color: "var(--text-1)" }}>{fmtDate(p.date)}</span>
+            <StatusBadge status={p.status} />
+            <span style={{ fontWeight: 600 }}>{fmtBRL(p.amount)}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 10 }}>
+        {studio.planStatus === "ativo" ? (
+          <button className="btn btn-ghost btn-block" style={{ color: "var(--danger)" }} onClick={() => onChangeStatus(studio.id, "cancelado_plano")}>Cancelar assinatura</button>
+        ) : (
+          <button className="btn btn-primary btn-block" onClick={() => onChangeStatus(studio.id, "ativo")}>Reativar assinatura</button>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+function AdminStudiosTab({ studios, setStudios, onMenu }) {
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("todos");
+  const [selected, setSelected] = useState(null);
+
+  const filtered = studios.filter(s => {
+    if (filter !== "todos" && s.plan !== filter) return false;
+    return s.name.toLowerCase().includes(search.toLowerCase()) || s.owner.email.toLowerCase().includes(search.toLowerCase());
+  });
+
+  const changeStatus = (id, status) => {
+    setStudios(studios.map(s => s.id === id ? { ...s, planStatus: status } : s));
+    setSelected(null);
+  };
+
+  return (
+    <div>
+      <TopBar title="Studios assinantes" onMenu={onMenu} />
+      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+        <input type="text" placeholder="Buscar por nome ou e-mail..." value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: 280 }} />
+        <div style={{ display: "flex", gap: 6 }}>
+          {[["todos", "Todos"], ["mensal", "Mensal"], ["anual", "Anual"]].map(([id, label]) => (
+            <button key={id} className={`tab ${filter === id ? "active" : ""}`} onClick={() => setFilter(id)}>{label}</button>
+          ))}
+        </div>
+      </div>
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <table>
+          <thead><tr><th>Studio</th><th>Plano</th><th>Status</th><th>Desde</th><th></th></tr></thead>
+          <tbody>
+            {filtered.map(s => (
+              <tr key={s.id} style={{ cursor: "pointer" }} onClick={() => setSelected(s)}>
+                <td><div style={{ display: "flex", alignItems: "center", gap: 10 }}><Avatar name={s.name} size={32} /><div><p style={{ fontWeight: 500 }}>{s.name}</p><p style={{ fontSize: 12, color: "var(--text-2)" }}>{s.owner.email}</p></div></div></td>
+                <td><span className="badge badge-lilac">{s.plan === "anual" ? "Anual" : "Mensal"}</span></td>
+                <td><StatusBadge status={s.planStatus} /></td>
+                <td style={{ color: "var(--text-2)" }}>{fmtDate(s.createdAt)}</td>
+                <td><Icon name="chevronRight" size={16} color="var(--text-2)" /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {filtered.length === 0 && <EmptyState icon="building" title="Nenhum studio encontrado" body="Ajuste sua busca ou filtro." />}
+      {selected && <StudioDetailModal studio={selected} onClose={() => setSelected(null)} onChangeStatus={changeStatus} />}
+    </div>
+  );
+}
+
+function AdminPlansTab({ onMenu }) {
+  const toast = useToast();
+  const [monthly, setMonthly] = useState(PLAN_PRICES.mensal);
+  const [annual, setAnnual] = useState(PLAN_PRICES.anual);
+
+  return (
+    <div>
+      <TopBar title="Planos e preços" onMenu={onMenu} />
+      <p style={{ color: "var(--text-2)", marginBottom: 22, maxWidth: 520, fontSize: 14.5 }}>
+        Estes são os valores exibidos para novos studios na sua página de vendas. Pensados para ficarem acessíveis e facilitar a conversão.
+      </p>
+      <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginBottom: 24 }}>
+        <div className="card" style={{ flex: 1, minWidth: 240 }}>
+          <p style={{ fontWeight: 600, marginBottom: 14 }}>Plano mensal</p>
+          <Field label="Valor (R$/mês)"><input type="number" value={monthly} onChange={e => setMonthly(Number(e.target.value))} /></Field>
+          <p style={{ fontSize: 13, color: "var(--text-2)" }}>Sem fidelidade, cobrado todo mês.</p>
+        </div>
+        <div className="card" style={{ flex: 1, minWidth: 240, border: "2px solid var(--lilac)" }}>
+          <p style={{ fontWeight: 600, marginBottom: 14 }}><Icon name="star" size={14} style={{ color: "var(--lilac)", marginRight: 6 }} />Plano anual</p>
+          <Field label="Valor (R$/ano)"><input type="number" value={annual} onChange={e => setAnnual(Number(e.target.value))} /></Field>
+          <p style={{ fontSize: 13, color: "var(--text-2)" }}>Equivale a {fmtBRL(annual / 12)}/mês — economia para fidelizar o cliente.</p>
+        </div>
+      </div>
+      <button className="btn btn-primary" onClick={() => toast("Preços atualizados na página de vendas")}>Salvar preços</button>
+      <div className="card" style={{ marginTop: 28, maxWidth: 420 }}>
+        <p style={{ fontWeight: 600, marginBottom: 12 }}>Formas de pagamento ativas</p>
+        {PAYMENT_METHODS.map(m => (
+          <div key={m.id} style={{ marginBottom: 12 }}>
+            <ToggleSwitch checked={true} onChange={() => toast(`${m.label} é uma forma de pagamento essencial e não pode ser desativada`, "info")} label={m.label} sub={m.desc} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AdminPaymentsTab({ studios, onMenu }) {
+  const allPayments = studios.flatMap(s => s.payments.map(p => ({ ...p, studioName: s.name })));
+  const totalReceived = allPayments.filter(p => p.status === "pago").reduce((s, p) => s + p.amount, 0);
+  return (
+    <div>
+      <TopBar title="Pagamentos recebidos" onMenu={onMenu} />
+      <div style={{ display: "flex", gap: 14, marginBottom: 24, flexWrap: "wrap" }}>
+        <StatCard icon="money" label="Total recebido na plataforma" value={fmtBRL(totalReceived)} tone="success" />
+        <StatCard icon="chart" label="Pagamentos registrados" value={allPayments.length} tone="lilac" />
+      </div>
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <table>
+          <thead><tr><th>Studio</th><th>Descrição</th><th>Data</th><th>Forma</th><th>Status</th><th style={{ textAlign: "right" }}>Valor</th></tr></thead>
+          <tbody>
+            {allPayments.slice().sort((a, b) => b.date.localeCompare(a.date)).map(p => (
+              <tr key={p.id}>
+                <td>{p.studioName}</td>
+                <td style={{ color: "var(--text-2)" }}>{p.label}</td>
+                <td style={{ color: "var(--text-2)" }}>{fmtDate(p.date)}</td>
+                <td>{PAYMENT_METHODS.find(m => m.id === p.method)?.label || p.method}</td>
+                <td><StatusBadge status={p.status} /></td>
+                <td style={{ textAlign: "right", fontWeight: 600 }}>{fmtBRL(p.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+
+function FreeAccessTab({ onMenu }) {
+  const toast = useToast();
+  const [list, setList] = React.useState(() => getFreeList());
+  const [email, setEmail] = React.useState("");
+  const [nome, setNome] = React.useState("");
+
+  const add = () => {
+    const e = email.trim().toLowerCase();
+    if (!e.includes("@")) return;
+    if (list.find(x => x.email === e)) { toast("Este e-mail já está na lista.", "error"); return; }
+    const next = [...list, { email: e, nome: nome.trim() || e, addedAt: todayISO() }];
+    setList(next);
+    saveFreeList(next);
+    setEmail(""); setNome("");
+    toast("Acesso gratuito liberado para " + e);
+  };
+
+  const remove = (e) => {
+    const next = list.filter(x => x.email !== e);
+    setList(next);
+    saveFreeList(next);
+    toast("Acesso removido", "info");
+  };
+
+  return (
+    <div>
+      <TopBar title="Acessos gratuitos" onMenu={onMenu} />
+      <p style={{ color: "var(--text-2)", marginBottom: 22, maxWidth: 520, fontSize: 14.5 }}>
+        Libere acesso gratuito para quem você quiser — sua esposa, sócios, amigos. Eles criam a conta normalmente e o sistema aceita sem cobrar.
+      </p>
+      <div className="card" style={{ marginBottom: 24, padding: 20 }}>
+        <p style={{ fontWeight: 600, marginBottom: 14, fontSize: 14 }}>Liberar novo acesso gratuito</p>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 180 }}>
+            <label>Nome (opcional)</label>
+            <input type="text" placeholder="Ex: Minha esposa" value={nome} onChange={e => setNome(e.target.value)} />
+          </div>
+          <div style={{ flex: 2, minWidth: 220 }}>
+            <label>E-mail</label>
+            <input type="email" placeholder="email@exemplo.com" value={email} onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && add()} />
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-end" }}>
+            <button className="btn btn-primary" onClick={add} disabled={!email.includes("@")} style={{ opacity: email.includes("@") ? 1 : 0.5 }}>
+              <Icon name="plus" size={15} /> Liberar acesso
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {list.length === 0 ? (
+        <EmptyState icon="star" title="Nenhum acesso gratuito ainda" body="Adicione o e-mail de quem você quer liberar acima." />
+      ) : (
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <table>
+            <thead><tr><th>Nome</th><th>E-mail</th><th>Liberado em</th><th></th></tr></thead>
+            <tbody>
+              {list.map(x => (
+                <tr key={x.email}>
+                  <td style={{ fontWeight: 500 }}>{x.nome}</td>
+                  <td style={{ color: "var(--text-2)" }}>{x.email}</td>
+                  <td style={{ color: "var(--text-2)" }}>{fmtDate(x.addedAt)}</td>
+                  <td>
+                    <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)", padding: 6 }} onClick={() => remove(x.email)}>
+                      <Icon name="trash" size={14} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="card" style={{ marginTop: 20, background: "rgba(199,125,255,0.06)", border: "1px solid rgba(199,125,255,0.2)" }}>
+        <div style={{ display: "flex", gap: 10 }}>
+          <span style={{ color: "var(--lilac)", flexShrink: 0 }}><Icon name="info" size={18} /></span>
+          <p style={{ fontSize: 13.5, color: "var(--text-1)", lineHeight: 1.7 }}>
+            A pessoa com acesso gratuito entra no site normalmente e clica em <b>"Criar minha agenda"</b>.
+            Na hora de pagar, o sistema vai reconhecer o e-mail dela e liberar sem cobrar nada.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminApp({ studios, setStudios, onLogout }) {
+  const [active, setActive] = useState("visao");
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const menuProps = { onMenu: () => setMobileOpen(true) };
+
+  const tabs = {
+    visao: <AdminOverview studios={studios} {...menuProps} />,
+    studios: <AdminStudiosTab studios={studios} setStudios={setStudios} {...menuProps} />,
+    acesso: <FreeAccessTab {...menuProps} />,
+    planos: <AdminPlansTab {...menuProps} />,
+    pagamentos: <AdminPaymentsTab studios={studios} {...menuProps} />,
+  };
+
+  return (
+    <div style={{ display: "flex" }}>
+      <AdminSidebar active={active} setActive={setActive} onLogout={onLogout} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+      <div className="main-content" style={{ flex: 1, marginLeft: 250, padding: "28px 32px", minHeight: "100vh" }}>
+        {tabs[active]}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   PUBLIC BOOKING PAGE — what the studio's end clients see
+   ============================================================ */
+function PublicBookingPage({ studio, onBookingComplete }) {
+  const [serviceId, setServiceId] = useState(studio.services[0]?.id || "");
+  const [date, setDate] = useState(todayISO());
+  const [time, setTime] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [done, setDone] = useState(false);
+
+  const days = Array.from({ length: 7 }, (_, i) => addDays(todayISO(), i));
+  const takenTimes = studio.appointments.filter(a => a.date === date).map(a => a.time);
+  const slots = ["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00"];
+  const service = studio.services.find(s => s.id === serviceId);
+
+  const canBook = serviceId && date && time && name.trim().length >= 2 && phone.trim().length >= 8;
+
+  const confirm = () => {
+    onBookingComplete({ serviceId, date, time, name, phone });
+    setDone(true);
+  };
+
+  if (done) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <div className="card" style={{ maxWidth: 420, textAlign: "center", padding: 36 }}>
+          <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(127,217,168,0.14)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px", color: "var(--success)" }}>
+            <Icon name="check" size={26} />
+          </div>
+          <h2 className="serif" style={{ fontSize: 22, marginBottom: 10 }}>Agendamento confirmado!</h2>
+          <p style={{ color: "var(--text-1)", marginBottom: 18, fontSize: 14.5 }}>
+            {service?.name} no dia {fmtDate(date)} às {time}. Você vai receber a confirmação e um lembrete no seu WhatsApp.
+          </p>
+          <div className="badge badge-success"><Icon name="whatsapp" size={13} /> Notificação enviada para {phone}</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", padding: "0 0 60px" }}>
+      <div style={{ borderBottom: "1px solid var(--line)", padding: "22px 0" }}>
+        <div className="container" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Avatar name={studio.name} size={42} tone="gold" />
+          <div>
+            <p className="serif" style={{ fontSize: 19, fontWeight: 500 }}>{studio.name}</p>
+            <p style={{ fontSize: 12.5, color: "var(--text-2)" }}>Agende seu horário online</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="container" style={{ maxWidth: 560, paddingTop: 32 }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-2)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 12 }}>1. Escolha o serviço</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 28 }}>
+          {studio.services.map(s => (
+            <button key={s.id} onClick={() => setServiceId(s.id)} style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 16px", borderRadius: 12, textAlign: "left",
+              border: serviceId === s.id ? "2px solid var(--lilac)" : "1px solid var(--line-strong)",
+              background: serviceId === s.id ? "rgba(199,125,255,0.06)" : "var(--bg-1)",
+            }}>
+              <div>
+                <p style={{ fontWeight: 500, fontSize: 14.5 }}>{s.name}</p>
+                <p style={{ fontSize: 12.5, color: "var(--text-2)" }}>{s.duration} min</p>
+              </div>
+              <span style={{ fontWeight: 600, color: "var(--gold)" }}>{fmtBRL(s.price)}</span>
+            </button>
+          ))}
+        </div>
+
+        <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-2)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 12 }}>2. Escolha o dia</p>
+        <div style={{ display: "flex", gap: 8, overflowX: "auto", marginBottom: 24, paddingBottom: 4 }}>
+          {days.map(d => (
+            <button key={d} onClick={() => { setDate(d); setTime(""); }} style={{
+              flexShrink: 0, minWidth: 64, padding: "9px 4px", borderRadius: 10, textAlign: "center",
+              border: date === d ? "2px solid var(--lilac)" : "1px solid var(--line-strong)",
+              background: date === d ? "rgba(199,125,255,0.08)" : "var(--bg-1)",
+            }}>
+              <p style={{ fontSize: 10.5, color: "var(--text-2)", textTransform: "uppercase" }}>{fmtDateLong(d).split(" ")[0].replace(".", "")}</p>
+              <p style={{ fontSize: 16, fontWeight: 600 }}>{d.slice(8, 10)}</p>
+            </button>
+          ))}
+        </div>
+
+        <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-2)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 12 }}>3. Escolha o horário</p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 28 }}>
+          {slots.map(t => {
+            const taken = takenTimes.includes(t);
+            return (
+              <button key={t} disabled={taken} onClick={() => setTime(t)} style={{
+                padding: "10px 4px", borderRadius: 10, fontSize: 13.5, fontWeight: 500,
+                border: time === t ? "2px solid var(--lilac)" : "1px solid var(--line-strong)",
+                background: taken ? "var(--bg-1)" : time === t ? "rgba(199,125,255,0.08)" : "var(--bg-card)",
+                color: taken ? "var(--text-2)" : "var(--text-0)",
+                opacity: taken ? 0.45 : 1, textDecoration: taken ? "line-through" : "none",
+              }}>{t}</button>
+            );
+          })}
+        </div>
+
+        <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-2)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 12 }}>4. Seus dados</p>
+        <Field label="Nome completo"><input type="text" placeholder="Seu nome" value={name} onChange={e => setName(e.target.value)} /></Field>
+        <Field label="WhatsApp"><input type="tel" placeholder="11 99999-0000" value={phone} onChange={e => setPhone(e.target.value)} /></Field>
+
+        <div className="card" style={{ background: "var(--bg-1)", marginBottom: 20, fontSize: 13, color: "var(--text-1)", display: "flex", gap: 8 }}>
+          <Icon name="whatsapp" size={16} style={{ color: "var(--success)", flexShrink: 0 }} />
+          Você vai receber a confirmação e um lembrete deste horário no seu WhatsApp.
+        </div>
+
+        <button className="btn btn-primary btn-block" disabled={!canBook} style={{ opacity: canBook ? 1 : 0.5 }} onClick={confirm}>
+          Confirmar agendamento
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   ROOT APP — routing between landing, auth, studio app, admin app
+   ============================================================ */
+const STORAGE_KEY = "agendaglow:db:v1";
+
+function LoadingScreen() {
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: 36, height: 36, borderRadius: "50%", border: "3px solid var(--bg-2)", borderTopColor: "var(--lilac)", animation: "spin 0.8s linear infinite" }} />
+      <style>{`@keyframes spin{ to{ transform:rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
+function Root() {
+  const [booted, setBooted] = useState(false);
+  const [studios, setStudios] = useState([]);
+  const [view, setView] = useState("landing"); // landing | signup | login | adminLogin | studio | admin | public
+  const [signupPlan, setSignupPlan] = useState("mensal");
+  const [session, setSession] = useState(null); // { type: 'studio'|'admin', studioId }
+  const [publicSlug, setPublicSlug] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  // boot: load from persistent storage, seed if empty
+  useEffect(() => {
+    (async () => {
+      const saved = await Store.get(STORAGE_KEY, null);
+      if (saved && saved.studios && saved.studios.length) {
+        setStudios(saved.studios);
+      } else {
+        const init = makeInitialDB();
+        setStudios(init.studios);
+        await Store.set(STORAGE_KEY, init);
+      }
+      // simple hash-based routing for public booking links: #/book/slug
+      const hash = window.location.hash;
+      if (hash.startsWith("#/book/")) {
+        setPublicSlug(hash.replace("#/book/", ""));
+        setView("public");
+      }
+      setBooted(true);
+    })();
+  }, []);
+
+  // persist whenever studios change (after boot)
+  useEffect(() => {
+    if (!booted) return;
+    Store.set(STORAGE_KEY, { studios });
+  }, [studios, booted]);
+
+  useEffect(() => {
+    if (toast) {
+      const t = setTimeout(() => setToast(null), 3200);
+      return () => clearTimeout(t);
+    }
+  }, [toast]);
+
+  if (!booted) return <LoadingScreen />;
+
+  const goLanding = () => { setView("landing"); setSession(null); };
+  const goSignup = (plan) => { setSignupPlan(plan && typeof plan === "string" ? plan : "mensal"); setView("signup"); };
+  const goLogin = () => setView("login");
+  const goAdminLogin = () => setView("adminLogin");
+
+  const handleSignupComplete = ({ studioName, ownerName, email, password, plan, payMethod }) => {
+    const isFree = getFreeList().some(x => x.email === email.trim().toLowerCase());
+    const slugBase = slugify(studioName) || "studio";
+    let slug = slugBase, n = 1;
+    while (studios.some(s => s.slug === slug)) { slug = `${slugBase}-${n++}`; }
+    const newStudio = seedStudio(studioName, slug, { name: ownerName, email, password }, plan);
+    newStudio.payments = [{
+      id: uid("pay"),
+      label: isFree ? "Acesso gratuito liberado pelo administrador" : `Assinatura Agenda Glow — Plano ${plan === "anual" ? "Anual" : "Mensal"}`,
+      amount: isFree ? 0 : (plan === "anual" ? PLAN_PRICES.anual : PLAN_PRICES.mensal),
+      date: todayISO(), method: isFree ? "gratuito" : payMethod, status: "pago",
+    }];
+    if (isFree) { newStudio.plan = "gratuito"; newStudio.planStatus = "ativo"; }
+    // give the new studio a clean slate (no demo clients/appointments) except sample services
+    newStudio.clients = [];
+    newStudio.appointments = [];
+    const next = [...studios, newStudio];
+    setStudios(next);
+    setSession({ type: "studio", studioId: newStudio.id });
+    setView("studio");
+    setToast({ msg: `Bem-vinda à Agenda Glow! Plano ${plan === "anual" ? "anual" : "mensal"} ativado.`, type: "success", key: uid("t") });
+  };
+
+  const handleStudioLogin = (email, password) => {
+    const studio = studios.find(s => s.owner.email.toLowerCase() === email.toLowerCase() && s.owner.password === password);
+    if (!studio) return false;
+    setSession({ type: "studio", studioId: studio.id });
+    setView("studio");
+    return true;
+  };
+
+  const handleAdminLogin = (email, password) => {
+    if (email.toLowerCase() === ADMIN_CRED.email && password === ADMIN_CRED.password) {
+      setSession({ type: "admin" });
+      setView("admin");
+      return true;
+    }
+    return false;
+  };
+
+  const logout = () => { setSession(null); setView("landing"); };
+
+  const currentStudio = session?.type === "studio" ? studios.find(s => s.id === session.studioId) : null;
+  const updateCurrentStudio = (next) => setStudios(studios.map(s => s.id === next.id ? next : s));
+
+  const publicStudio = publicSlug ? studios.find(s => s.slug === publicSlug) : null;
+
+  const handlePublicBooking = ({ serviceId, date, time, name, phone }) => {
+    if (!publicStudio) return;
+    let clients = publicStudio.clients;
+    let client = clients.find(c => c.phone === phone);
+    if (!client) {
+      client = { id: uid("cli"), name, phone };
+      clients = [...clients, client];
+    }
+    const appt = { id: uid("apt"), clientId: client.id, serviceId, date, time, status: "confirmado" };
+    const next = { ...publicStudio, clients, appointments: [...publicStudio.appointments, appt] };
+    setStudios(studios.map(s => s.id === next.id ? next : s));
+  };
+
+  const ctx = { toast, setToast };
+
+  let content;
+  if (view === "public" && publicStudio) {
+    content = <PublicBookingPage studio={publicStudio} onBookingComplete={handlePublicBooking} />;
+  } else if (view === "public" && !publicStudio) {
+    content = (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <EmptyState icon="alertTriangle" title="Studio não encontrado" body="Este link de agendamento não existe ou foi removido." action={
+          <button className="btn btn-primary" onClick={() => { window.location.hash = ""; goLanding(); }}>Voltar para o início</button>
+        } />
+      </div>
+    );
+  } else if (view === "signup") {
+    content = <SignupScreen initialPlan={signupPlan} onBack={goLanding} onComplete={handleSignupComplete} />;
+  } else if (view === "login") {
+    content = <LoginScreen onBack={goLanding} onLogin={handleStudioLogin} role="studio" />;
+  } else if (view === "adminLogin") {
+    content = <LoginScreen onBack={goLanding} onLogin={handleAdminLogin} role="admin" />;
+  } else if (view === "studio" && currentStudio) {
+    content = <StudioApp studio={currentStudio} setStudio={updateCurrentStudio} onLogout={logout} />;
+  } else if (view === "admin" && session?.type === "admin") {
+    content = <AdminApp studios={studios} setStudios={setStudios} onLogout={logout} />;
+  } else {
+    content = <LandingPage onLogin={goLogin} onSignup={goSignup} onAdminLogin={goAdminLogin} />;
+  }
+
+  return (
+    <AppCtx.Provider value={ctx}>
+      {content}
+      <Toast toast={toast} />
+    </AppCtx.Provider>
+  );
+}
+
+/* responsive helper styles injected once */
+const responsiveStyle = document.createElement("style");
+responsiveStyle.innerHTML = `
+  @media (max-width: 900px) {
+    .nav-desktop a { display: none; }
+  }
+  @media (max-width: 860px) {
+    .sidebar-desktop { transform: translateX(-100%); }
+    .main-content { margin-left: 0 !important; padding: 22px 18px !important; }
+    .menu-toggle { display: inline-flex !important; }
+    .admin-grid { grid-template-columns: 1fr !important; }
+  }
+`;
+document.head.appendChild(responsiveStyle);
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<Root />);
+</script>
+
+<!-- Banner de instalação PWA -->
+<div id="pwa-banner" style="display:none; position:fixed; bottom:0; left:0; right:0; z-index:9999;
+  background:linear-gradient(135deg,#1F1922,#211B26); border-top:1px solid rgba(245,240,232,0.16);
+  padding:16px 20px; display:none; align-items:center; gap:14px; box-shadow:0 -8px 32px rgba(0,0,0,0.5);">
+  <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#C77DFF,#E8C4A0);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1A1420" stroke-width="2">
+      <path d="M12 3l1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5L12 3z"/>
+    </svg>
+  </div>
+  <div style="flex:1;min-width:0;">
+    <p style="font-family:Inter,sans-serif;font-weight:700;font-size:14px;color:#F5F0E8;margin:0 0 2px;">
+      Instalar Agenda Glow</p>
+    <p style="font-family:Inter,sans-serif;font-size:12px;color:#8B8594;margin:0;">
+      Adicione à tela inicial e acesse como app</p>
+  </div>
+  <button id="pwa-install-btn" style="background:linear-gradient(135deg,#C77DFF,#9D4EDD);color:#fff;
+    border:none;border-radius:10px;padding:10px 18px;font-family:Inter,sans-serif;font-weight:700;
+    font-size:13px;cursor:pointer;flex-shrink:0;">Instalar</button>
+  <button id="pwa-dismiss-btn" style="background:none;border:none;color:#8B8594;cursor:pointer;
+    padding:8px;flex-shrink:0;font-size:20px;line-height:1;">×</button>
+</div>
+
+<div id="ios-banner" style="display:none; position:fixed; bottom:0; left:0; right:0; z-index:9999;
+  background:linear-gradient(135deg,#1F1922,#211B26); border-top:1px solid rgba(245,240,232,0.16);
+  padding:18px 20px; box-shadow:0 -8px 32px rgba(0,0,0,0.5);">
+  <button id="ios-dismiss-btn" style="position:absolute;top:12px;right:14px;background:none;border:none;
+    color:#8B8594;cursor:pointer;font-size:20px;line-height:1;">×</button>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+    <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#C77DFF,#E8C4A0);
+      display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1A1420" stroke-width="2">
+        <path d="M12 3l1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5L12 3z"/>
+      </svg>
+    </div>
+    <div>
+      <p style="font-family:Inter,sans-serif;font-weight:700;font-size:14px;color:#F5F0E8;margin:0 0 2px;">
+        Instalar no iPhone</p>
+      <p style="font-family:Inter,sans-serif;font-size:12px;color:#8B8594;margin:0;">
+        Acesse como app, sem precisar da App Store</p>
+    </div>
+  </div>
+  <div style="background:rgba(245,240,232,0.06);border-radius:12px;padding:14px 16px;">
+    <p style="font-family:Inter,sans-serif;font-size:13px;color:#C9C2D1;margin:0 0 8px;">
+      <b style="color:#F5F0E8;">1.</b> Toque em
+      <span style="display:inline-flex;align-items:center;gap:3px;background:rgba(199,125,255,0.15);
+        border-radius:6px;padding:2px 8px;color:#C77DFF;font-weight:700;">
+        Compartilhar
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/>
+        </svg>
+      </span>
+      na barra do Safari
+    </p>
+    <p style="font-family:Inter,sans-serif;font-size:13px;color:#C9C2D1;margin:0;">
+      <b style="color:#F5F0E8;">2.</b> Escolha <b style="color:#F5F0E8;">"Adicionar à Tela de Início"</b>
+      e depois <b style="color:#F5F0E8;">"Adicionar"</b>
+    </p>
+  </div>
+</div>
+
+<script>
+(function() {
+  let deferredPrompt = null;
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isInStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  const dismissed = sessionStorage.getItem('pwa-dismissed');
+
+  if (isInStandalone || dismissed) return;
+
+  if (isIOS) {
+    setTimeout(() => {
+      const b = document.getElementById('ios-banner');
+      if (b) b.style.display = 'block';
+    }, 4000);
+    document.getElementById('ios-dismiss-btn')?.addEventListener('click', () => {
+      document.getElementById('ios-banner').style.display = 'none';
+      sessionStorage.setItem('pwa-dismissed', '1');
+    });
+  } else {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      setTimeout(() => {
+        const b = document.getElementById('pwa-banner');
+        if (b) b.style.display = 'flex';
+      }, 4000);
+    });
+
+    document.getElementById('pwa-install-btn')?.addEventListener('click', () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(() => {
+        deferredPrompt = null;
+        document.getElementById('pwa-banner').style.display = 'none';
+      });
+    });
+
+    document.getElementById('pwa-dismiss-btn')?.addEventListener('click', () => {
+      document.getElementById('pwa-banner').style.display = 'none';
+      sessionStorage.setItem('pwa-dismissed', '1');
+    });
+  }
+})();
+</script>
+
+</body>
+</html>
