@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>Agenda Glow — Sistema de agendamento para estúdios de estética</title>
 
 <!-- PWA: aparece como app no celular -->
@@ -101,9 +101,9 @@ if ('serviceWorker' in navigator) {
     --sans:'Inter', -apple-system, sans-serif;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
-  html,body{background:var(--bg-0); color:var(--text-0); font-family:var(--sans); -webkit-font-smoothing:antialiased;}
-  body{overflow-x:hidden;}
-  #root{min-height:100vh;}
+  html,body{background:var(--bg-0); color:var(--text-0); font-family:var(--sans); -webkit-font-smoothing:antialiased; height:100%; overflow-x:hidden;}
+  /* FIX: viewport dinâmica para iOS/Android — resolve tela cortando */
+  #root{min-height:100vh; min-height:100dvh; min-height:-webkit-fill-available;}
   a{color:inherit; text-decoration:none;}
   button{font-family:inherit; cursor:pointer;}
   input,select,textarea{font-family:inherit;}
@@ -203,6 +203,7 @@ if ('serviceWorker' in navigator) {
   .badge-success{ background: rgba(127,217,168,0.14); color:var(--success); border:1px solid rgba(127,217,168,0.3); }
   .badge-danger{ background: rgba(232,132,154,0.14); color:var(--danger); border:1px solid rgba(232,132,154,0.3); }
   .badge-gray{ background: var(--bg-2); color:var(--text-2); border:1px solid var(--line); }
+  .badge-warning{ background: rgba(240,180,41,0.14); color:#f0b429; border:1px solid rgba(240,180,41,0.3); }
 
   table{ width:100%; border-collapse:collapse; }
   th{ text-align:left; font-size:12px; color:var(--text-2); font-weight:600; text-transform:uppercase; letter-spacing:0.04em; padding:10px 12px; border-bottom:1px solid var(--line); }
@@ -243,6 +244,8 @@ if ('serviceWorker' in navigator) {
   }
   .sidebar-link:hover{ background: var(--bg-2); color:var(--text-0); }
   .sidebar-link.active{ background: rgba(199,125,255,0.12); color:var(--lilac); }
+  /* FIX main-content: nunca corta no mobile */
+  .main-content{ flex:1; min-height:100vh; min-height:100dvh; padding:28px 32px; padding-bottom:calc(28px + env(safe-area-inset-bottom)); }
 
   .tab{
     padding:9px 18px; border-radius:100px; font-size:13.5px; font-weight:600;
@@ -394,6 +397,7 @@ function seedStudio(name, slug, owner, plan) {
     whatsappNumber: "11 90000-0000",
     whatsappNotifications: true,
     color: "lilac",
+    isDemo: true,
     clients, services, appointments, payments,
   };
 }
@@ -1030,7 +1034,7 @@ function StudioSidebar({ active, setActive, studio, onLogout, mobileOpen, setMob
       {mobileOpen && <div onClick={() => setMobileOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 39 }} />}
       <div style={{
         width: 250, background: "var(--bg-1)", borderRight: "1px solid var(--line)", padding: 20,
-        display: "flex", flexDirection: "column", height: "100vh", position: "fixed", top: 0, left: 0, zIndex: 40,
+        display: "flex", flexDirection: "column", height: "100vh", minHeight: "100dvh", position: "fixed", top: 0, left: 0, zIndex: 40, overflowY: "auto", paddingBottom: "calc(20px + env(safe-area-inset-bottom))",
         transform: mobileOpen ? "translateX(0)" : undefined, transition: "transform .2s ease",
       }} className={mobileOpen ? "" : "sidebar-desktop"}>
         <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 28, padding: "0 6px" }}>
@@ -1087,7 +1091,56 @@ function StatCard({ icon, label, value, tone = "lilac" }) {
   );
 }
 
-/* ---------- Agenda tab ---------- */
+const MONTH_NAMES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+function isoToYearMonth(iso) { const [y,m] = iso.split("-"); return {year:parseInt(y), month:parseInt(m)}; }
+function addMonths(iso, n) { const {year,month} = isoToYearMonth(iso); const d = new Date(year, month-1+n, 1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`; }
+function getMonthDays(ym) { const {year,month} = isoToYearMonth(ym); const first = new Date(year,month-1,1).getDay(); const total = new Date(year,month,0).getDate(); const days=[]; for(let i=0;i<first;i++) days.push(null); for(let d=1;d<=total;d++) days.push(`${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`); return days; }
+
+function MonthCalendar({ appointments, selectedDate, onSelect }) {
+  const today = todayISO();
+  const [curMonth, setCurMonth] = useState(today.slice(0,8)+"01");
+  const {year, month} = isoToYearMonth(curMonth);
+  const days = getMonthDays(curMonth);
+  const weekDays = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+  const apptByDay = {};
+  appointments.forEach(a => { apptByDay[a.date] = (apptByDay[a.date]||0)+1; });
+  return (
+    <div className="card" style={{padding:16, marginBottom:22}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+        <button onClick={()=>setCurMonth(addMonths(curMonth,-1))} className="btn btn-ghost btn-sm" style={{padding:8}}><Icon name="chevronLeft" size={16}/></button>
+        <span style={{fontWeight:600,fontSize:15}}>{MONTH_NAMES[month-1]} {year}</span>
+        <button onClick={()=>setCurMonth(addMonths(curMonth,1))} className="btn btn-ghost btn-sm" style={{padding:8}}><Icon name="chevronRight" size={16}/></button>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:4}}>
+        {weekDays.map(d=><div key={d} style={{textAlign:"center",fontSize:10.5,color:"var(--text-2)",fontWeight:600,padding:"3px 0"}}>{d}</div>)}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
+        {days.map((iso,i)=>{
+          if(!iso) return <div key={`e${i}`}/>;
+          const isSel = iso===selectedDate, isToday = iso===today, count = apptByDay[iso]||0;
+          return (
+            <button key={iso} onClick={()=>onSelect(iso)} style={{
+              aspectRatio:"1",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+              borderRadius:8,fontSize:12.5,fontWeight:isToday?700:500,cursor:"pointer",border:"1px solid transparent",
+              background:isSel?"rgba(199,125,255,0.14)":"transparent",
+              borderColor:isSel?"var(--lilac)":"transparent",
+              color:isSel?"var(--lilac)":isToday?"var(--text-0)":"var(--text-1)",
+              transition:"all .15s ease",
+            }}>
+              {iso.slice(8,10)}
+              {count>0 && <div style={{width:4,height:4,borderRadius:"50%",background:"var(--lilac)",marginTop:1}}/>}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{marginTop:10,textAlign:"center"}}>
+        <button className="btn btn-ghost btn-sm" onClick={()=>{setCurMonth(today.slice(0,8)+"01");onSelect(today);}}>Ir para hoje</button>
+      </div>
+    </div>
+  );
+}
+
+
 function AppointmentModal({ studio, onClose, onSave, editing }) {
   const [clientId, setClientId] = useState(editing?.clientId || studio.clients[0]?.id || "");
   const [serviceId, setServiceId] = useState(editing?.serviceId || studio.services[0]?.id || "");
@@ -1139,7 +1192,6 @@ function AgendaTab({ studio, updateStudio, onMenu }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
 
-  const days = Array.from({ length: 7 }, (_, i) => addDays(todayISO(), i));
   const dayAppts = studio.appointments.filter(a => a.date === selectedDate).sort((a, b) => a.time.localeCompare(b.time));
 
   const getClient = (id) => studio.clients.find(c => c.id === id);
@@ -1172,18 +1224,12 @@ function AgendaTab({ studio, updateStudio, onMenu }) {
         </button>
       } />
 
-      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginBottom: 22 }}>
-        {days.map(d => (
-          <button key={d} onClick={() => setSelectedDate(d)} style={{
-            flexShrink: 0, minWidth: 72, padding: "10px 6px", borderRadius: 12, textAlign: "center",
-            border: selectedDate === d ? "2px solid var(--lilac)" : "1px solid var(--line-strong)",
-            background: selectedDate === d ? "rgba(199,125,255,0.08)" : "var(--bg-1)",
-          }}>
-            <p style={{ fontSize: 11, color: "var(--text-2)", textTransform: "uppercase" }}>{fmtDateLong(d).split(" ")[0].replace(".", "")}</p>
-            <p style={{ fontSize: 17, fontWeight: 600, marginTop: 2 }}>{d.slice(8, 10)}</p>
-            {d === todayISO() && <span style={{ fontSize: 9.5, color: "var(--lilac)" }}>hoje</span>}
-          </button>
-        ))}
+      <MonthCalendar appointments={studio.appointments} selectedDate={selectedDate} onSelect={setSelectedDate} />
+
+      <div style={{marginBottom:14}}>
+        <p style={{fontSize:13.5,color:"var(--text-2)"}}>
+          {selectedDate === todayISO() ? "Hoje" : fmtDateLong(selectedDate)} — <b style={{color:"var(--text-0)"}}>{dayAppts.length}</b> agendamento{dayAppts.length!==1?"s":""}
+        </p>
       </div>
 
       {dayAppts.length === 0 ? (
@@ -1484,7 +1530,7 @@ function StudioApp({ studio, setStudio, onLogout }) {
   return (
     <div style={{ display: "flex" }}>
       <StudioSidebar active={active} setActive={setActive} studio={studio} onLogout={onLogout} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
-      <div className="main-content" style={{ flex: 1, marginLeft: 250, padding: "28px 32px", minHeight: "100vh" }}>
+      <div className="main-content" style={{ flex: 1, marginLeft: 250 }}>
         {tabs[active]}
       </div>
     </div>
@@ -1507,7 +1553,7 @@ function AdminSidebar({ active, setActive, onLogout, mobileOpen, setMobileOpen }
       {mobileOpen && <div onClick={() => setMobileOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 39 }} />}
       <div style={{
         width: 250, background: "var(--bg-1)", borderRight: "1px solid var(--line)", padding: 20,
-        display: "flex", flexDirection: "column", height: "100vh", position: "fixed", top: 0, left: 0, zIndex: 40,
+        display: "flex", flexDirection: "column", height: "100vh", minHeight: "100dvh", position: "fixed", top: 0, left: 0, zIndex: 40, overflowY: "auto", paddingBottom: "calc(20px + env(safe-area-inset-bottom))",
         transform: mobileOpen ? "translateX(0)" : undefined, transition: "transform .2s ease",
       }} className={mobileOpen ? "" : "sidebar-desktop"}>
         <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10, padding: "0 6px" }}>
@@ -1541,33 +1587,80 @@ function platformStats(studios) {
   return { active: active.length, mrr, annualCount, monthlyCount, totalRevenue, total: studios.length };
 }
 
-function AdminOverview({ studios, onMenu }) {
+function billingStatus(s) {
+  if (s.planStatus === "cancelado_plano") return "cancelado";
+  if (!s.nextBilling) return "ativo";
+  const diff = Math.floor((new Date(s.nextBilling) - new Date(todayISO())) / 86400000);
+  if (diff < -7) return "bloqueado";
+  if (diff < 0) return "pendente";
+  if (diff <= 5) return "vencendo";
+  return "ativo";
+}
+const billingLabel = { ativo:"Em dia", vencendo:"Vence em breve", pendente:"Pagamento pendente", bloqueado:"Bloqueado", cancelado:"Cancelado" };
+const billingBadge = { ativo:"badge-success", vencendo:"badge-warning", pendente:"badge-gold", bloqueado:"badge-danger", cancelado:"badge-gray" };
+
+function AdminOverview({ studios, setStudios, onMenu }) {
   const stats = platformStats(studios);
   const recentStudios = studios.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5);
+  const demoCount = studios.filter(s => s.isDemo).length;
+  const statusCount = { ativo:0, vencendo:0, pendente:0, bloqueado:0, cancelado:0 };
+  studios.forEach(s => { const b = billingStatus(s); statusCount[b] = (statusCount[b]||0)+1; });
+
+  const limparDemos = () => {
+    if (!window.confirm(`Remover as ${demoCount} conta(s) de demonstração permanentemente?`)) return;
+    setStudios(studios.filter(s => !s.isDemo));
+  };
+
   return (
     <div>
       <TopBar title="Visão geral da plataforma" onMenu={onMenu} />
+
+      {demoCount > 0 && (
+        <div className="card" style={{background:"rgba(240,180,41,0.06)",border:"1px solid rgba(240,180,41,0.25)",padding:14,marginBottom:20,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+          <p style={{fontSize:13.5,color:"var(--text-1)"}}><b style={{color:"#f0b429"}}>⚠ {demoCount}</b> conta{demoCount>1?"s":""} de demonstração ativas. Remova antes de publicar.</p>
+          <button className="btn btn-sm" style={{background:"rgba(240,180,41,0.15)",color:"#f0b429",border:"1px solid rgba(240,180,41,0.3)"}} onClick={limparDemos}>
+            <Icon name="trash" size={13}/> Remover demonstrações
+          </button>
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 26 }}>
         <StatCard icon="building" label="Studios ativos" value={stats.active} tone="lilac" />
         <StatCard icon="chart" label="Receita mensal recorrente" value={fmtBRL(stats.mrr)} tone="success" />
-        <StatCard icon="crown" label="Assinantes do plano anual" value={stats.annualCount} tone="gold" />
-        <StatCard icon="money" label="Receita total já recebida" value={fmtBRL(stats.totalRevenue)} tone="lilac" />
+        <StatCard icon="crown" label="Assinantes anuais" value={stats.annualCount} tone="gold" />
+        <StatCard icon="money" label="Receita total" value={fmtBRL(stats.totalRevenue)} tone="lilac" />
+      </div>
+
+      {/* Resumo de status de pagamento */}
+      <div className="card" style={{marginBottom:20}}>
+        <p style={{fontWeight:600,marginBottom:12,fontSize:14}}>Status de pagamento</p>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {[["ativo","Em dia","badge-success"],["vencendo","Vence em breve","badge-warning"],["pendente","Pendente","badge-gold"],["bloqueado","Bloqueado","badge-danger"],["cancelado","Cancelado","badge-gray"]].map(([k,l,b])=>(
+            <div key={k} style={{display:"flex",alignItems:"center",gap:7,padding:"7px 12px",background:"var(--bg-1)",borderRadius:8}}>
+              <span className={`badge ${b}`} style={{padding:"2px 7px",fontSize:11}}>{statusCount[k]||0}</span>
+              <span style={{fontSize:12.5,color:"var(--text-1)"}}>{l}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 18 }} className="admin-grid">
         <div className="card">
           <p style={{ fontWeight: 600, marginBottom: 16 }}>Studios cadastrados recentemente</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            {recentStudios.map(s => (
-              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid var(--line)" }}>
-                <Avatar name={s.name} size={36} />
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontWeight: 500, fontSize: 14 }}>{s.name}</p>
-                  <p style={{ fontSize: 12.5, color: "var(--text-2)" }}>{s.owner.email} · desde {fmtDate(s.createdAt)}</p>
+            {recentStudios.map(s => {
+              const bs = billingStatus(s);
+              return (
+                <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid var(--line)" }}>
+                  <Avatar name={s.name} size={36} />
+                  <div style={{ flex: 1, minWidth:0 }}>
+                    <p style={{ fontWeight: 500, fontSize: 14, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{s.name}</p>
+                    <p style={{ fontSize: 12.5, color: "var(--text-2)" }}>{s.owner.email} · {fmtDate(s.createdAt)}</p>
+                  </div>
+                  <span className={`badge ${billingBadge[bs]}`} style={{fontSize:10.5,flexShrink:0}}>{billingLabel[bs]}</span>
                 </div>
-                <span className="badge badge-lilac">{s.plan === "anual" ? "Anual" : "Mensal"}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
         <div className="card">
@@ -1600,8 +1693,18 @@ function AdminOverview({ studios, onMenu }) {
   );
 }
 
-function StudioDetailModal({ studio, onClose, onChangeStatus }) {
+function StudioDetailModal({ studio, onClose, onChangeStatus, onDelete }) {
+  const toast = useToast();
   const totalRevenue = studio.payments.filter(p => p.status === "pago").reduce((a, p) => a + p.amount, 0);
+  const bs = billingStatus(studio);
+
+  const handleDelete = () => {
+    if (!window.confirm(`Excluir DEFINITIVAMENTE o studio "${studio.name}"? Não pode ser desfeito.`)) return;
+    onDelete(studio.id);
+    onClose();
+    toast("Studio excluído definitivamente", "info");
+  };
+
   return (
     <Modal onClose={onClose} width={560}>
       <ModalHeader title={studio.name} onClose={onClose} />
@@ -1612,11 +1715,18 @@ function StudioDetailModal({ studio, onClose, onChangeStatus }) {
           <p style={{ fontSize: 13, color: "var(--text-2)" }}>{studio.owner.email}</p>
         </div>
       </div>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
         <span className="badge badge-lilac">Plano {studio.plan === "anual" ? "anual" : "mensal"}</span>
-        <StatusBadge status={studio.planStatus} />
-        <span className="badge badge-gray">Link: agendaglow.app/{studio.slug}</span>
+        <span className={`badge ${billingBadge[bs]}`}>{billingLabel[bs]}</span>
+        {studio.isDemo && <span className="badge badge-warning">Demonstração</span>}
       </div>
+      {(bs==="bloqueado"||bs==="pendente") && (
+        <div className="card" style={{background:"rgba(232,132,154,0.06)",border:"1px solid rgba(232,132,154,0.25)",padding:12,marginBottom:14}}>
+          <p style={{fontSize:13,color:"var(--danger)"}}>
+            {bs==="bloqueado"?"⛔ Studio bloqueado por inadimplência.":"⚠ Pagamento pendente."} Vencimento: {fmtDate(studio.nextBilling)}.
+          </p>
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
         <div className="card" style={{ background: "var(--bg-1)" }}>
           <p style={{ fontSize: 12.5, color: "var(--text-2)" }}>Clientes cadastrados</p>
@@ -1632,11 +1742,12 @@ function StudioDetailModal({ studio, onClose, onChangeStatus }) {
         </div>
         <div className="card" style={{ background: "var(--bg-1)" }}>
           <p style={{ fontSize: 12.5, color: "var(--text-2)" }}>Próxima cobrança</p>
-          <p className="serif" style={{ fontSize: 20, fontWeight: 500 }}>{fmtDate(studio.nextBilling)}</p>
+          <p className="serif" style={{ fontSize: 20, fontWeight: 500, color:(bs==="bloqueado"||bs==="pendente")?"var(--danger)":undefined }}>{fmtDate(studio.nextBilling)}</p>
         </div>
       </div>
       <p style={{ fontWeight: 600, marginBottom: 10, fontSize: 14 }}>Pagamentos da assinatura</p>
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20, maxHeight: 160, overflowY: "auto" }}>
+        {studio.payments.length === 0 && <p style={{fontSize:13,color:"var(--text-2)"}}>Nenhum pagamento registrado.</p>}
         {studio.payments.map(p => (
           <div key={p.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, padding: "8px 0", borderBottom: "1px solid var(--line)" }}>
             <span style={{ color: "var(--text-1)" }}>{fmtDate(p.date)}</span>
@@ -1645,12 +1756,15 @@ function StudioDetailModal({ studio, onClose, onChangeStatus }) {
           </div>
         ))}
       </div>
-      <div style={{ display: "flex", gap: 10 }}>
+      <div style={{ display: "flex", gap: 10, flexWrap:"wrap" }}>
         {studio.planStatus === "ativo" ? (
-          <button className="btn btn-ghost btn-block" style={{ color: "var(--danger)" }} onClick={() => onChangeStatus(studio.id, "cancelado_plano")}>Cancelar assinatura</button>
+          <button className="btn btn-ghost" style={{ color: "var(--danger)", flex:1 }} onClick={() => onChangeStatus(studio.id, "cancelado_plano")}>Cancelar assinatura</button>
         ) : (
-          <button className="btn btn-primary btn-block" onClick={() => onChangeStatus(studio.id, "ativo")}>Reativar assinatura</button>
+          <button className="btn btn-primary" style={{ flex:1 }} onClick={() => onChangeStatus(studio.id, "ativo")}>Reativar assinatura</button>
         )}
+        <button className="btn btn-sm" style={{background:"rgba(232,132,154,0.12)",color:"var(--danger)",border:"1px solid rgba(232,132,154,0.25)"}} onClick={handleDelete}>
+          <Icon name="trash" size={14}/> Excluir conta
+        </button>
       </div>
     </Modal>
   );
@@ -1659,10 +1773,12 @@ function StudioDetailModal({ studio, onClose, onChangeStatus }) {
 function AdminStudiosTab({ studios, setStudios, onMenu }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("todos");
+  const [filterStatus, setFilterStatus] = useState("todos");
   const [selected, setSelected] = useState(null);
 
   const filtered = studios.filter(s => {
     if (filter !== "todos" && s.plan !== filter) return false;
+    if (filterStatus !== "todos" && billingStatus(s) !== filterStatus) return false;
     return s.name.toLowerCase().includes(search.toLowerCase()) || s.owner.email.toLowerCase().includes(search.toLowerCase());
   });
 
@@ -1671,35 +1787,57 @@ function AdminStudiosTab({ studios, setStudios, onMenu }) {
     setSelected(null);
   };
 
+  const deleteStudio = (id) => {
+    setStudios(studios.filter(s => s.id !== id));
+    setSelected(null);
+  };
+
   return (
     <div>
       <TopBar title="Studios assinantes" onMenu={onMenu} />
-      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 12, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
         <input type="text" placeholder="Buscar por nome ou e-mail..." value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: 280 }} />
         <div style={{ display: "flex", gap: 6 }}>
-          {[["todos", "Todos"], ["mensal", "Mensal"], ["anual", "Anual"]].map(([id, label]) => (
-            <button key={id} className={`tab ${filter === id ? "active" : ""}`} onClick={() => setFilter(id)}>{label}</button>
+          {[["todos","Todos"],["mensal","Mensal"],["anual","Anual"]].map(([id,label]) => (
+            <button key={id} className={`tab ${filter===id?"active":""}`} onClick={()=>setFilter(id)}>{label}</button>
           ))}
         </div>
       </div>
+      <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
+        {[["todos","Todos"],["ativo","Em dia"],["vencendo","Vence em breve"],["pendente","Pendente"],["bloqueado","Bloqueado"],["cancelado","Cancelado"]].map(([id,label])=>(
+          <button key={id} className={`tab ${filterStatus===id?"active":""}`} style={{fontSize:12,padding:"6px 11px"}} onClick={()=>setFilterStatus(id)}>{label}</button>
+        ))}
+      </div>
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         <table>
-          <thead><tr><th>Studio</th><th>Plano</th><th>Status</th><th>Desde</th><th></th></tr></thead>
+          <thead><tr><th>Studio</th><th>Plano</th><th>Pagamento</th><th>Desde</th><th>Próx. cobrança</th><th></th></tr></thead>
           <tbody>
-            {filtered.map(s => (
-              <tr key={s.id} style={{ cursor: "pointer" }} onClick={() => setSelected(s)}>
-                <td><div style={{ display: "flex", alignItems: "center", gap: 10 }}><Avatar name={s.name} size={32} /><div><p style={{ fontWeight: 500 }}>{s.name}</p><p style={{ fontSize: 12, color: "var(--text-2)" }}>{s.owner.email}</p></div></div></td>
-                <td><span className="badge badge-lilac">{s.plan === "anual" ? "Anual" : "Mensal"}</span></td>
-                <td><StatusBadge status={s.planStatus} /></td>
-                <td style={{ color: "var(--text-2)" }}>{fmtDate(s.createdAt)}</td>
-                <td><Icon name="chevronRight" size={16} color="var(--text-2)" /></td>
-              </tr>
-            ))}
+            {filtered.map(s => {
+              const bs = billingStatus(s);
+              return (
+                <tr key={s.id} style={{ cursor: "pointer" }} onClick={() => setSelected(s)}>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <Avatar name={s.name} size={32} />
+                      <div>
+                        <p style={{ fontWeight: 500 }}>{s.name}{s.isDemo&&<span className="badge badge-warning" style={{marginLeft:6,fontSize:10,padding:"2px 6px"}}>Demo</span>}</p>
+                        <p style={{ fontSize: 12, color: "var(--text-2)" }}>{s.owner.email}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td><span className="badge badge-lilac">{s.plan==="anual"?"Anual":"Mensal"}</span></td>
+                  <td><span className={`badge ${billingBadge[bs]}`} style={{fontSize:11}}>{billingLabel[bs]}</span></td>
+                  <td style={{ color: "var(--text-2)" }}>{fmtDate(s.createdAt)}</td>
+                  <td style={{ color: (bs==="bloqueado"||bs==="pendente")?"var(--danger)":"var(--text-2)" }}>{fmtDate(s.nextBilling)}</td>
+                  <td><Icon name="chevronRight" size={16} color="var(--text-2)" /></td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
       {filtered.length === 0 && <EmptyState icon="building" title="Nenhum studio encontrado" body="Ajuste sua busca ou filtro." />}
-      {selected && <StudioDetailModal studio={selected} onClose={() => setSelected(null)} onChangeStatus={changeStatus} />}
+      {selected && <StudioDetailModal studio={selected} onClose={()=>setSelected(null)} onChangeStatus={changeStatus} onDelete={deleteStudio} />}
     </div>
   );
 }
@@ -1864,7 +2002,7 @@ function AdminApp({ studios, setStudios, onLogout }) {
   const menuProps = { onMenu: () => setMobileOpen(true) };
 
   const tabs = {
-    visao: <AdminOverview studios={studios} {...menuProps} />,
+    visao: <AdminOverview studios={studios} setStudios={setStudios} {...menuProps} />,
     studios: <AdminStudiosTab studios={studios} setStudios={setStudios} {...menuProps} />,
     acesso: <FreeAccessTab {...menuProps} />,
     planos: <AdminPlansTab {...menuProps} />,
@@ -1874,7 +2012,7 @@ function AdminApp({ studios, setStudios, onLogout }) {
   return (
     <div style={{ display: "flex" }}>
       <AdminSidebar active={active} setActive={setActive} onLogout={onLogout} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
-      <div className="main-content" style={{ flex: 1, marginLeft: 250, padding: "28px 32px", minHeight: "100vh" }}>
+      <div className="main-content" style={{ flex: 1, marginLeft: 250 }}>
         {tabs[active]}
       </div>
     </div>
@@ -2002,6 +2140,10 @@ function PublicBookingPage({ studio, onBookingComplete }) {
    ROOT APP — routing between landing, auth, studio app, admin app
    ============================================================ */
 const STORAGE_KEY = "agendaglow:db:v1";
+const SESSION_KEY = "agendaglow:session:v2";
+function saveSession(s){ try{localStorage.setItem(SESSION_KEY,JSON.stringify(s));}catch(e){} }
+function loadSession(){ try{const r=localStorage.getItem(SESSION_KEY);return r?JSON.parse(r):null;}catch(e){return null;} }
+function clearSession(){ try{localStorage.removeItem(SESSION_KEY);}catch(e){} }
 
 function LoadingScreen() {
   return (
@@ -2032,11 +2174,15 @@ function Root() {
         setStudios(init.studios);
         await Store.set(STORAGE_KEY, init);
       }
-      // simple hash-based routing for public booking links: #/book/slug
+      // Restaurar sessão persistente
+      const savedSession = loadSession();
       const hash = window.location.hash;
       if (hash.startsWith("#/book/")) {
         setPublicSlug(hash.replace("#/book/", ""));
         setView("public");
+      } else if (savedSession) {
+        setSession(savedSession);
+        setView(savedSession.type === "admin" ? "admin" : "studio");
       }
       setBooted(true);
     })();
@@ -2057,7 +2203,7 @@ function Root() {
 
   if (!booted) return <LoadingScreen />;
 
-  const goLanding = () => { setView("landing"); setSession(null); };
+  const goLanding = () => { setView("landing"); setSession(null); clearSession(); };
   const goSignup = (plan) => { setSignupPlan(plan && typeof plan === "string" ? plan : "mensal"); setView("signup"); };
   const goLogin = () => setView("login");
   const goAdminLogin = () => setView("adminLogin");
@@ -2088,21 +2234,23 @@ function Root() {
   const handleStudioLogin = (email, password) => {
     const studio = studios.find(s => s.owner.email.toLowerCase() === email.toLowerCase() && s.owner.password === password);
     if (!studio) return false;
-    setSession({ type: "studio", studioId: studio.id });
+    const ns = { type: "studio", studioId: studio.id };
+    setSession(ns); saveSession(ns);
     setView("studio");
     return true;
   };
 
   const handleAdminLogin = (email, password) => {
     if (email.toLowerCase() === ADMIN_CRED.email && password === ADMIN_CRED.password) {
-      setSession({ type: "admin" });
+      const ns = { type: "admin" };
+      setSession(ns); saveSession(ns);
       setView("admin");
       return true;
     }
     return false;
   };
 
-  const logout = () => { setSession(null); setView("landing"); };
+  const logout = () => { setSession(null); clearSession(); setView("landing"); };
 
   const currentStudio = session?.type === "studio" ? studios.find(s => s.id === session.studioId) : null;
   const updateCurrentStudio = (next) => setStudios(studios.map(s => s.id === next.id ? next : s));
@@ -2157,20 +2305,27 @@ function Root() {
   );
 }
 
-/* responsive helper styles injected once */
-const responsiveStyle = document.createElement("style");
-responsiveStyle.innerHTML = `
-  @media (max-width: 900px) {
+  @media (max-width:900px){
     .nav-desktop a { display: none; }
   }
   @media (max-width: 860px) {
-    .sidebar-desktop { transform: translateX(-100%); }
-    .main-content { margin-left: 0 !important; padding: 22px 18px !important; }
+    .sidebar-desktop { transform: translateX(-100%) !important; }
+    .sidebar-desktop.sidebar-open { transform: translateX(0) !important; }
+    .main-content { margin-left: 0 !important; padding: 18px 16px !important; padding-bottom: calc(18px + env(safe-area-inset-bottom)) !important; }
     .menu-toggle { display: inline-flex !important; }
     .admin-grid { grid-template-columns: 1fr !important; }
   }
-`;
-document.head.appendChild(responsiveStyle);
+  @media (min-width: 861px) {
+    .sidebar-desktop { transform: translateX(0) !important; }
+  }
+  /* Badge de status de pagamento */
+  .badge-warning{ background: rgba(240,180,41,0.14); color:#f0b429; border:1px solid rgba(240,180,41,0.3); }
+  /* Calendário mensal */
+  .cal-day{ aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:10px; font-size:13px; font-weight:500; cursor:pointer; border:1px solid transparent; transition:all .15s ease; min-width:0; }
+  .cal-day:hover{ background:var(--bg-2); }
+  .cal-day.cal-selected{ background:rgba(199,125,255,0.14); border-color:var(--lilac); color:var(--lilac); }
+  .cal-day.cal-today{ font-weight:700; }
+  .cal-dot{ width:5px; height:5px; border-radius:50%; background:var(--lilac); margin-top:2px; }
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(<Root />);
