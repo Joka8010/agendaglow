@@ -256,6 +256,15 @@ if ('serviceWorker' in navigator) {
 
   .skel{ background: linear-gradient(90deg, var(--bg-1) 0%, var(--bg-2) 50%, var(--bg-1) 100%); background-size:200% 100%; animation: skel 1.4s ease infinite; border-radius:8px; }
   @keyframes skel{ to{ background-position: -200% 0; } }
+
+  @media (max-width:900px){ .nav-desktop a { display: none; } }
+  @media (max-width: 860px) {
+    .sidebar-desktop { transform: translateX(-100%) !important; }
+    .main-content { margin-left: 0 !important; padding: 18px 16px !important; padding-bottom: calc(18px + env(safe-area-inset-bottom)) !important; }
+    .menu-toggle { display: inline-flex !important; }
+    .admin-grid { grid-template-columns: 1fr !important; }
+  }
+  @media (min-width: 861px) { .sidebar-desktop { transform: translateX(0) !important; } }
 </style>
 </head>
 <body>
@@ -2304,28 +2313,6 @@ function Root() {
     </AppCtx.Provider>
   );
 }
-
-  @media (max-width:900px){
-    .nav-desktop a { display: none; }
-  }
-  @media (max-width: 860px) {
-    .sidebar-desktop { transform: translateX(-100%) !important; }
-    .sidebar-desktop.sidebar-open { transform: translateX(0) !important; }
-    .main-content { margin-left: 0 !important; padding: 18px 16px !important; padding-bottom: calc(18px + env(safe-area-inset-bottom)) !important; }
-    .menu-toggle { display: inline-flex !important; }
-    .admin-grid { grid-template-columns: 1fr !important; }
-  }
-  @media (min-width: 861px) {
-    .sidebar-desktop { transform: translateX(0) !important; }
-  }
-  /* Badge de status de pagamento */
-  .badge-warning{ background: rgba(240,180,41,0.14); color:#f0b429; border:1px solid rgba(240,180,41,0.3); }
-  /* Calendário mensal */
-  .cal-day{ aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:10px; font-size:13px; font-weight:500; cursor:pointer; border:1px solid transparent; transition:all .15s ease; min-width:0; }
-  .cal-day:hover{ background:var(--bg-2); }
-  .cal-day.cal-selected{ background:rgba(199,125,255,0.14); border-color:var(--lilac); color:var(--lilac); }
-  .cal-day.cal-today{ font-weight:700; }
-  .cal-dot{ width:5px; height:5px; border-radius:50%; background:var(--lilac); margin-top:2px; }
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(<Root />);
