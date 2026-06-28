@@ -101,9 +101,9 @@ if ('serviceWorker' in navigator) {
     --sans:'Inter', -apple-system, sans-serif;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
-  html,body{background:var(--bg-0); color:var(--text-0); font-family:var(--sans); -webkit-font-smoothing:antialiased; height:100%; overflow-x:hidden;}
+  html,body{background:var(--bg-0); color:var(--text-0); font-family:var(--sans); -webkit-font-smoothing:antialiased; height:100%; max-width:100vw; overflow-x:hidden;}
   /* FIX: viewport dinâmica para iOS/Android — resolve tela cortando */
-  #root{min-height:100vh; min-height:100dvh; min-height:-webkit-fill-available;}
+  #root{min-height:100vh; min-height:100dvh; min-height:-webkit-fill-available; max-width:100vw; overflow-x:hidden;}
   a{color:inherit; text-decoration:none;}
   button{font-family:inherit; cursor:pointer;}
   input,select,textarea{font-family:inherit;}
@@ -244,8 +244,8 @@ if ('serviceWorker' in navigator) {
   }
   .sidebar-link:hover{ background: var(--bg-2); color:var(--text-0); }
   .sidebar-link.active{ background: rgba(199,125,255,0.12); color:var(--lilac); }
-  /* FIX main-content: nunca corta no mobile */
-  .main-content{ flex:1; min-height:100vh; min-height:100dvh; padding:28px 32px; padding-bottom:calc(28px + env(safe-area-inset-bottom)); }
+  /* FIX main-content: nunca corta no mobile (min-width:0 evita que o flex item estoure pelo conteúdo) */
+  .main-content{ flex:1; min-width:0; max-width:100%; min-height:100vh; min-height:100dvh; padding:28px 32px; padding-bottom:calc(28px + env(safe-area-inset-bottom)); overflow-x:hidden; }
 
   .tab{
     padding:9px 18px; border-radius:100px; font-size:13.5px; font-weight:600;
@@ -260,9 +260,14 @@ if ('serviceWorker' in navigator) {
   @media (max-width:900px){ .nav-desktop a { display: none; } }
   @media (max-width: 860px) {
     .sidebar-desktop { transform: translateX(-100%) !important; }
-    .main-content { margin-left: 0 !important; padding: 18px 16px !important; padding-bottom: calc(18px + env(safe-area-inset-bottom)) !important; }
+    .main-content { margin-left: 0 !important; padding: 18px 16px !important; padding-bottom: calc(18px + env(safe-area-inset-bottom)) !important; max-width: 100vw !important; }
     .menu-toggle { display: inline-flex !important; }
     .admin-grid { grid-template-columns: 1fr !important; }
+    .card { max-width: 100%; }
+    .stat-card { min-width: 130px !important; }
+  }
+  @media (max-width: 380px) {
+    .stat-card { min-width: 100% !important; }
   }
   @media (min-width: 861px) { .sidebar-desktop { transform: translateX(0) !important; } }
 </style>
@@ -1091,7 +1096,7 @@ function TopBar({ title, onMenu, right }) {
 function StatCard({ icon, label, value, tone = "lilac" }) {
   const color = tone === "lilac" ? "var(--lilac)" : tone === "gold" ? "var(--gold)" : tone === "success" ? "var(--success)" : "var(--text-1)";
   return (
-    <div className="card" style={{ flex: 1, minWidth: 150 }}>
+    <div className="card stat-card" style={{ flex: 1, minWidth: 150 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-2)", fontSize: 13, marginBottom: 10 }}>
         <span style={{ color }}><Icon name={icon} size={16} /></span>{label}
       </div>
@@ -1537,7 +1542,7 @@ function StudioApp({ studio, setStudio, onLogout }) {
   };
 
   return (
-    <div style={{ display: "flex" }}>
+    <div style={{ display: "flex", width: "100%", maxWidth: "100vw", overflowX: "hidden" }}>
       <StudioSidebar active={active} setActive={setActive} studio={studio} onLogout={onLogout} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
       <div className="main-content" style={{ flex: 1, marginLeft: 250 }}>
         {tabs[active]}
@@ -2019,7 +2024,7 @@ function AdminApp({ studios, setStudios, onLogout }) {
   };
 
   return (
-    <div style={{ display: "flex" }}>
+    <div style={{ display: "flex", width: "100%", maxWidth: "100vw", overflowX: "hidden" }}>
       <AdminSidebar active={active} setActive={setActive} onLogout={onLogout} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
       <div className="main-content" style={{ flex: 1, marginLeft: 250 }}>
         {tabs[active]}
@@ -2149,6 +2154,7 @@ function PublicBookingPage({ studio, onBookingComplete }) {
    ROOT APP — routing between landing, auth, studio app, admin app
    ============================================================ */
 const STORAGE_KEY = "agendaglow:db:v1";
+const SEEDED_KEY = "agendaglow:seeded:v1";
 const SESSION_KEY = "agendaglow:session:v2";
 function saveSession(s){ try{localStorage.setItem(SESSION_KEY,JSON.stringify(s));}catch(e){} }
 function loadSession(){ try{const r=localStorage.getItem(SESSION_KEY);return r?JSON.parse(r):null;}catch(e){return null;} }
@@ -2172,16 +2178,28 @@ function Root() {
   const [publicSlug, setPublicSlug] = useState(null);
   const [toast, setToast] = useState(null);
 
-  // boot: load from persistent storage, seed if empty
+  // boot: load from persistent storage, seed ONLY on the very first run ever.
+  // FIX: antes, um array de studios vazio (ex: depois de "Remover demonstrações"
+  // remover tudo) era tratado como "nunca inicializado" e o app recriava as
+  // contas de demonstração sozinho. Agora guardamos uma flag separada
+  // (agendaglow:seeded:v1) que marca "já inicializei alguma vez" — uma vez
+  // marcada, um array vazio é respeitado como vazio de verdade, e os
+  // clientes/studios de teste nunca mais voltam.
   useEffect(() => {
     (async () => {
+      const alreadySeeded = await Store.get(SEEDED_KEY, false);
       const saved = await Store.get(STORAGE_KEY, null);
-      if (saved && saved.studios && saved.studios.length) {
+      if (alreadySeeded) {
+        setStudios(saved && saved.studios ? saved.studios : []);
+      } else if (saved && saved.studios && saved.studios.length) {
+        // Banco já existia (versão antiga) mas a flag ainda não — apenas marca, não semeia de novo.
         setStudios(saved.studios);
+        await Store.set(SEEDED_KEY, true);
       } else {
         const init = makeInitialDB();
         setStudios(init.studios);
         await Store.set(STORAGE_KEY, init);
+        await Store.set(SEEDED_KEY, true);
       }
       // Restaurar sessão persistente
       const savedSession = loadSession();
