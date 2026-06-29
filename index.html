@@ -250,7 +250,7 @@ if ('serviceWorker' in navigator) {
   .sidebar-link:hover{ background: var(--bg-2); color:var(--text-0); }
   .sidebar-link.active{ background: rgba(199,125,255,0.12); color:var(--lilac); }
   /* FIX main-content: nunca corta no mobile (min-width:0 evita que o flex item estoure pelo conteúdo) */
-  .main-content{ flex:1; min-width:0; max-width:100%; min-height:100vh; min-height:100dvh; padding:28px 32px; padding-bottom:calc(28px + env(safe-area-inset-bottom)); overflow-x:hidden; }
+  .main-content{ flex:1; min-width:0; max-width:100%; min-height:100vh; min-height:100dvh; padding:28px 32px; padding-top:calc(28px + env(safe-area-inset-top)); padding-bottom:calc(28px + env(safe-area-inset-bottom)); overflow-x:hidden; }
 
   .tab{
     padding:9px 18px; border-radius:100px; font-size:13.5px; font-weight:600;
@@ -265,14 +265,22 @@ if ('serviceWorker' in navigator) {
   @media (max-width:900px){ .nav-desktop a { display: none; } }
   @media (max-width: 860px) {
     .sidebar-desktop { transform: translateX(-100%) !important; }
-    .main-content { margin-left: 0 !important; padding: 18px 16px !important; padding-bottom: calc(18px + env(safe-area-inset-bottom)) !important; max-width: 100vw !important; }
+    .main-content { margin-left: 0 !important; padding: 18px 16px !important; padding-top: calc(18px + env(safe-area-inset-top)) !important; padding-bottom: calc(18px + env(safe-area-inset-bottom)) !important; max-width: 100vw !important; }
     .menu-toggle { display: inline-flex !important; }
     .admin-grid { grid-template-columns: 1fr !important; }
     .card { max-width: 100%; }
     .stat-card { min-width: 130px !important; }
+    .topbar-title { font-size: 20px !important; }
+    .topbar-row { margin-bottom: 18px !important; }
+    .table-wrap { position: relative; }
+    .table-wrap::after {
+      content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 24px; pointer-events: none;
+      background: linear-gradient(to right, transparent, var(--bg-card, var(--bg-1)) 85%);
+    }
   }
   @media (max-width: 380px) {
     .stat-card { min-width: 100% !important; }
+    .topbar-title { font-size: 18px !important; }
   }
   @media (min-width: 861px) { .sidebar-desktop { transform: translateX(0) !important; } }
 </style>
@@ -1196,12 +1204,12 @@ function StudioSidebar({ active, setActive, studio, onLogout, mobileOpen, setMob
 
 function TopBar({ title, onMenu, right }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 26, gap: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <button className="menu-toggle btn btn-ghost btn-sm" onClick={onMenu} style={{ display: "none", padding: 8 }} aria-label="Abrir menu">
+    <div className="topbar-row" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 26, gap: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, minWidth: 0 }}>
+        <button className="menu-toggle btn btn-ghost btn-sm" onClick={onMenu} style={{ display: "none", padding: 8, flexShrink: 0 }} aria-label="Abrir menu">
           <Icon name="menu" size={18} />
         </button>
-        <h1 className="serif" style={{ fontSize: 25, fontWeight: 500 }}>{title}</h1>
+        <h1 className="serif topbar-title" style={{ fontSize: 25, fontWeight: 500, minWidth: 0, lineHeight: 1.25 }}>{title}</h1>
       </div>
       {right}
     </div>
@@ -1736,6 +1744,7 @@ function AdminSidebar({ active, setActive, onLogout, mobileOpen, setMobileOpen }
     { id: "studios", label: "Studios assinantes", icon: "building" },
     { id: "planos", label: "Planos e preços", icon: "crown" },
     { id: "pagamentos", label: "Pagamentos recebidos", icon: "money" },
+    { id: "config", label: "Configurações", icon: "settings" },
   ];
   return (
     <>
@@ -2103,6 +2112,84 @@ function AdminPaymentsTab({ studios, onMenu }) {
 
 
 
+
+
+function AdminConfigTab({ onMenu }) {
+  const toast = useToast();
+  const [email, setEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabaseClient.auth.getUser();
+      setEmail(data?.user?.email || "");
+    })();
+  }, []);
+
+  const canSave = newPassword.length >= 6 && newPassword === confirmPassword;
+
+  const savePassword = async () => {
+    setError("");
+    if (newPassword.length < 6) { setError("A senha precisa ter pelo menos 6 caracteres."); return; }
+    if (newPassword !== confirmPassword) { setError("As senhas não coincidem."); return; }
+    setSaving(true);
+    const { error: err } = await supabaseClient.auth.updateUser({ password: newPassword });
+    setSaving(false);
+    if (err) { setError("Não foi possível trocar a senha. Tente novamente."); return; }
+    setNewPassword(""); setConfirmPassword("");
+    toast("Senha do administrador atualizada com sucesso");
+  };
+
+  return (
+    <div>
+      <TopBar title="Configurações" onMenu={onMenu} />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 18, maxWidth: 560 }}>
+        <div className="card">
+          <p style={{ fontWeight: 600, marginBottom: 4 }}>Conta administrativa</p>
+          <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 16 }}>Login usado para acessar este painel</p>
+          <Field label="E-mail de acesso">
+            <input type="email" value={email} readOnly style={{ color: "var(--text-2)" }} />
+          </Field>
+        </div>
+
+        <div className="card">
+          <p style={{ fontWeight: 600, marginBottom: 4 }}>Trocar senha</p>
+          <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 16 }}>Recomendado antes de divulgar o link de venda para o público</p>
+          {error && <div className="badge badge-danger" style={{ marginBottom: 14, display: "flex" }}>{error}</div>}
+          <Field label="Nova senha">
+            <div style={{ position: "relative" }}>
+              <input type={showPw ? "text" : "password"} placeholder="Mínimo 6 caracteres" value={newPassword} onChange={e => setNewPassword(e.target.value)} style={{ paddingRight: 42 }} />
+              <button onClick={() => setShowPw(!showPw)} style={{ position: "absolute", right: 10, top: 9, background: "none", border: "none", color: "var(--text-2)" }} tabIndex={-1} aria-label={showPw ? "Ocultar senha" : "Mostrar senha"}>
+                <Icon name={showPw ? "eyeOff" : "eye"} size={17} />
+              </button>
+            </div>
+          </Field>
+          <Field label="Confirmar nova senha">
+            <input type={showPw ? "text" : "password"} placeholder="Repita a nova senha" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+          </Field>
+          <button className="btn btn-primary" onClick={savePassword} disabled={!canSave || saving} style={{ opacity: (canSave && !saving) ? 1 : 0.5 }}>
+            {saving ? "Salvando..." : "Salvar nova senha"}
+          </button>
+        </div>
+
+        <div className="card" style={{ background: "rgba(199,125,255,0.06)", border: "1px solid rgba(199,125,255,0.2)" }}>
+          <div style={{ display: "flex", gap: 10 }}>
+            <span style={{ color: "var(--lilac)", flexShrink: 0 }}><Icon name="info" size={18} /></span>
+            <p style={{ fontSize: 13.5, color: "var(--text-1)", lineHeight: 1.7 }}>
+              Antes de divulgar o link de venda na Kiwify ou Cakto, troque essa senha por uma só sua, que mais ninguém saiba.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function AdminApp({ onLogout }) {
   const [active, setActive] = useState("visao");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -2151,6 +2238,7 @@ function AdminApp({ onLogout }) {
     studios: <AdminStudiosTab studios={studios} onChangeStatus={changeStatus} onDeleteStudio={deleteStudioAdmin} onRenewFree={renewFree} {...menuProps} />,
     planos: <AdminPlansTab {...menuProps} />,
     pagamentos: <AdminPaymentsTab studios={studios} {...menuProps} />,
+    config: <AdminConfigTab {...menuProps} />,
   };
 
   return (
@@ -2499,105 +2587,4 @@ root.render(<Root />);
   padding:16px 20px; display:none; align-items:center; gap:14px; box-shadow:0 -8px 32px rgba(0,0,0,0.5);">
   <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#C77DFF,#E8C4A0);
     display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1A1420" stroke-width="2">
-      <path d="M12 3l1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5L12 3z"/>
-    </svg>
-  </div>
-  <div style="flex:1;min-width:0;">
-    <p style="font-family:Inter,sans-serif;font-weight:700;font-size:14px;color:#F5F0E8;margin:0 0 2px;">
-      Instalar Agenda Glow</p>
-    <p style="font-family:Inter,sans-serif;font-size:12px;color:#8B8594;margin:0;">
-      Adicione à tela inicial e acesse como app</p>
-  </div>
-  <button id="pwa-install-btn" style="background:linear-gradient(135deg,#C77DFF,#9D4EDD);color:#fff;
-    border:none;border-radius:10px;padding:10px 18px;font-family:Inter,sans-serif;font-weight:700;
-    font-size:13px;cursor:pointer;flex-shrink:0;">Instalar</button>
-  <button id="pwa-dismiss-btn" style="background:none;border:none;color:#8B8594;cursor:pointer;
-    padding:8px;flex-shrink:0;font-size:20px;line-height:1;">×</button>
-</div>
-
-<div id="ios-banner" style="display:none; position:fixed; bottom:0; left:0; right:0; z-index:9999;
-  background:linear-gradient(135deg,#1F1922,#211B26); border-top:1px solid rgba(245,240,232,0.16);
-  padding:18px 20px; box-shadow:0 -8px 32px rgba(0,0,0,0.5);">
-  <button id="ios-dismiss-btn" style="position:absolute;top:12px;right:14px;background:none;border:none;
-    color:#8B8594;cursor:pointer;font-size:20px;line-height:1;">×</button>
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-    <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#C77DFF,#E8C4A0);
-      display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1A1420" stroke-width="2">
-        <path d="M12 3l1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5L12 3z"/>
-      </svg>
-    </div>
-    <div>
-      <p style="font-family:Inter,sans-serif;font-weight:700;font-size:14px;color:#F5F0E8;margin:0 0 2px;">
-        Instalar no iPhone</p>
-      <p style="font-family:Inter,sans-serif;font-size:12px;color:#8B8594;margin:0;">
-        Acesse como app, sem precisar da App Store</p>
-    </div>
-  </div>
-  <div style="background:rgba(245,240,232,0.06);border-radius:12px;padding:14px 16px;">
-    <p style="font-family:Inter,sans-serif;font-size:13px;color:#C9C2D1;margin:0 0 8px;">
-      <b style="color:#F5F0E8;">1.</b> Toque em
-      <span style="display:inline-flex;align-items:center;gap:3px;background:rgba(199,125,255,0.15);
-        border-radius:6px;padding:2px 8px;color:#C77DFF;font-weight:700;">
-        Compartilhar
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-          <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/>
-        </svg>
-      </span>
-      na barra do Safari
-    </p>
-    <p style="font-family:Inter,sans-serif;font-size:13px;color:#C9C2D1;margin:0;">
-      <b style="color:#F5F0E8;">2.</b> Escolha <b style="color:#F5F0E8;">"Adicionar à Tela de Início"</b>
-      e depois <b style="color:#F5F0E8;">"Adicionar"</b>
-    </p>
-  </div>
-</div>
-
-<script>
-(function() {
-  let deferredPrompt = null;
-  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const isInStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-  const dismissed = sessionStorage.getItem('pwa-dismissed');
-
-  if (isInStandalone || dismissed) return;
-
-  if (isIOS) {
-    setTimeout(() => {
-      const b = document.getElementById('ios-banner');
-      if (b) b.style.display = 'block';
-    }, 4000);
-    document.getElementById('ios-dismiss-btn')?.addEventListener('click', () => {
-      document.getElementById('ios-banner').style.display = 'none';
-      sessionStorage.setItem('pwa-dismissed', '1');
-    });
-  } else {
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      setTimeout(() => {
-        const b = document.getElementById('pwa-banner');
-        if (b) b.style.display = 'flex';
-      }, 4000);
-    });
-
-    document.getElementById('pwa-install-btn')?.addEventListener('click', () => {
-      if (!deferredPrompt) return;
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then(() => {
-        deferredPrompt = null;
-        document.getElementById('pwa-banner').style.display = 'none';
-      });
-    });
-
-    document.getElementById('pwa-dismiss-btn')?.addEventListener('click', () => {
-      document.getElementById('pwa-banner').style.display = 'none';
-      sessionStorage.setItem('pwa-dismissed', '1');
-    });
-  }
-})();
-</script>
-
-</body>
-</html>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" s
