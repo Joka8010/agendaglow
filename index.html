@@ -77,6 +77,7 @@ if ('serviceWorker' in navigator) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   :root{
     --bg-0:#0F0D12;
@@ -360,22 +361,14 @@ function buildWhatsappLink(phone, message) {
 const initials = (name) => name.split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
 
 /* ============================================================
-   STORAGE — usa localStorage para funcionar em qualquer navegador
+   SUPABASE — conexão com o banco de dados real na nuvem
    ============================================================ */
-const Store = {
-  async get(key, fallback) {
-    try {
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
-    } catch (e) { return fallback; }
-  },
-  async set(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
-  },
-};
+const SUPABASE_URL = "https://zmvutobctfjtzkuzoqqm.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_6RptizG_CWqlJyOxE4i65g_UjR8VYvC";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* ============================================================
-   SEED DATA — demo content so the product feels alive immediately
+   PLANOS E TEMPLATES — conteúdo fixo do produto
    ============================================================ */
 const PLAN_PRICES = { mensal: 19.9, anual: 197 };
 
@@ -394,59 +387,164 @@ const SERVICE_TEMPLATES = [
   { name: "Peeling facial", duration: 45, price: 160 },
 ];
 
-function seedStudio(name, slug, owner, plan) {
-  const clients = [
-    { id: uid("cli"), name: "Ana Carolina Souza", phone: "11 98888-1234" },
-    { id: uid("cli"), name: "Beatriz Lima", phone: "11 97777-2345" },
-    { id: uid("cli"), name: "Camila Ferreira", phone: "11 96666-3456" },
-    { id: uid("cli"), name: "Daniela Rocha", phone: "11 95555-4567" },
-  ];
-  const services = SERVICE_TEMPLATES.slice(0, 4).map(s => ({ id: uid("srv"), ...s }));
-  const today = todayISO();
-  const appointments = [
-    { id: uid("apt"), clientId: clients[0].id, serviceId: services[0].id, date: today, time: "09:00", status: "confirmado" },
-    { id: uid("apt"), clientId: clients[1].id, serviceId: services[1].id, date: today, time: "11:00", status: "confirmado" },
-    { id: uid("apt"), clientId: clients[2].id, serviceId: services[2].id, date: addDays(today, 1), time: "14:00", status: "pendente" },
-    { id: uid("apt"), clientId: clients[3].id, serviceId: services[0].id, date: addDays(today, 2), time: "10:00", status: "confirmado" },
-  ];
-  const payments = [
-    { id: uid("pay"), label: "Assinatura Agenda Glow — Plano " + (plan === "anual" ? "Anual" : "Mensal"), amount: PLAN_PRICES[plan], date: addDays(today, -30), method: "pix", status: "pago" },
-    { id: uid("pay"), label: "Assinatura Agenda Glow — Plano " + (plan === "anual" ? "Anual" : "Mensal"), amount: PLAN_PRICES[plan], date: today, method: "pix", status: "pago" },
-  ];
+/* ============================================================
+   DB — camada de acesso ao Supabase. Cada função conversa com
+   uma tabela real no banco de dados, já filtrando pelos dados
+   do estúdio certo (a segurança real é garantida pelo RLS no
+   banco, isso aqui é só a "ponte" que monta as consultas).
+   ============================================================ */
+function mapStudioRow(row, owner) {
   return {
-    id: uid("studio"),
-    name, slug, owner,
-    plan, planStatus: "ativo",
-    createdAt: addDays(today, -30),
-    nextBilling: addDays(today, plan === "anual" ? 335 : 1),
-    whatsappNumber: "11 90000-0000",
-    color: "lilac",
-    isDemo: true,
-    clients, services, appointments, payments,
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    owner: owner || { name: "", email: "" },
+    plan: row.plan,
+    planStatus: row.plan_status,
+    createdAt: (row.created_at || "").slice(0, 10),
+    nextBilling: row.next_billing,
+    whatsappNumber: row.whatsapp_number || "",
+    color: row.color || "lilac",
+    clients: [], services: [], appointments: [], payments: [],
   };
 }
 
-const DEMO_OWNER = { name: "Mariana Castro", email: "mariana@exemplo.com", password: "123456" };
-const DEMO_STUDIO = seedStudio("Studio Mariana Castro Estética", "studio-mariana-castro", DEMO_OWNER, "mensal");
+const DB = {
+  // --- STUDIOS ---
+  async getStudioByOwner(userId, userEmail) {
+    const { data, error } = await supabaseClient.from("studios").select("*").eq("owner_id", userId).maybeSingle();
+    if (error || !data) return null;
+    return mapStudioRow(data, { name: data.name, email: userEmail });
+  },
+  async getStudioBySlug(slug) {
+    const { data, error } = await supabaseClient.from("studios").select("*").eq("slug", slug).maybeSingle();
+    if (error || !data) return null;
+    return mapStudioRow(data, { name: data.name, email: "" });
+  },
+  async createStudio({ ownerId, ownerEmail, ownerName, studioName, slug, plan }) {
+    const today = todayISO();
+    const { data, error } = await supabaseClient.from("studios").insert({
+      owner_id: ownerId,
+      name: studioName,
+      slug,
+      plan,
+      plan_status: "ativo",
+      next_billing: addDays(today, plan === "anual" ? 365 : 30),
+      whatsapp_number: "",
+      color: "lilac",
+    }).select().single();
+    if (error) throw error;
+    // semeia alguns serviços de exemplo para o estúdio não nascer vazio
+    const templates = SERVICE_TEMPLATES.slice(0, 4).map(s => ({ studio_id: data.id, name: s.name, duration: s.duration, price: s.price }));
+    await supabaseClient.from("services").insert(templates);
+    return mapStudioRow(data, { name: ownerName, email: ownerEmail });
+  },
+  async updateStudio(studioId, patch) {
+    const payload = {};
+    if (patch.name !== undefined) payload.name = patch.name;
+    if (patch.whatsappNumber !== undefined) payload.whatsapp_number = patch.whatsappNumber;
+    if (patch.color !== undefined) payload.color = patch.color;
+    if (patch.plan !== undefined) payload.plan = patch.plan;
+    if (patch.planStatus !== undefined) payload.plan_status = patch.planStatus;
+    if (patch.nextBilling !== undefined) payload.next_billing = patch.nextBilling;
+    const { error } = await supabaseClient.from("studios").update(payload).eq("id", studioId);
+    if (error) throw error;
+  },
+  async listAllStudios() {
+    const { data, error } = await supabaseClient.from("studios").select("*").order("created_at", { ascending: false });
+    if (error || !data) return [];
+    return data.map(row => mapStudioRow(row, { name: "", email: "" }));
+  },
+  async deleteStudio(studioId) {
+    const { error } = await supabaseClient.from("studios").delete().eq("id", studioId);
+    if (error) throw error;
+  },
 
-const ADMIN_CRED = { email: "joaocesar8010@outlook.com", password: "Joka2203" };
+  // --- CLIENTS ---
+  async listClients(studioId) {
+    const { data, error } = await supabaseClient.from("clients").select("*").eq("studio_id", studioId).order("name");
+    if (error || !data) return [];
+    return data.map(r => ({ id: r.id, name: r.name, phone: r.phone || "" }));
+  },
+  async createClient(studioId, { name, phone }) {
+    const { data, error } = await supabaseClient.from("clients").insert({ studio_id: studioId, name, phone }).select().single();
+    if (error) throw error;
+    return { id: data.id, name: data.name, phone: data.phone || "" };
+  },
+  async updateClient(clientId, { name, phone }) {
+    const { error } = await supabaseClient.from("clients").update({ name, phone }).eq("id", clientId);
+    if (error) throw error;
+  },
+  async deleteClient(clientId) {
+    const { error } = await supabaseClient.from("clients").delete().eq("id", clientId);
+    if (error) throw error;
+  },
 
-// Lista de e-mails com acesso gratuito liberado pelo admin
-const FREE_ACCESS_LIST_KEY = "agendaglow:free_access";
-function getFreeList() {
-  try { return JSON.parse(localStorage.getItem(FREE_ACCESS_LIST_KEY) || "[]"); } catch(e) { return []; }
-}
-function saveFreeList(list) {
-  try { localStorage.setItem(FREE_ACCESS_LIST_KEY, JSON.stringify(list)); } catch(e) {}
-}
+  // --- SERVICES ---
+  async listServices(studioId) {
+    const { data, error } = await supabaseClient.from("services").select("*").eq("studio_id", studioId).order("name");
+    if (error || !data) return [];
+    return data.map(r => ({ id: r.id, name: r.name, duration: r.duration, price: Number(r.price) }));
+  },
+  async createService(studioId, { name, duration, price }) {
+    const { data, error } = await supabaseClient.from("services").insert({ studio_id: studioId, name, duration, price }).select().single();
+    if (error) throw error;
+    return { id: data.id, name: data.name, duration: data.duration, price: Number(data.price) };
+  },
+  async updateService(serviceId, { name, duration, price }) {
+    const { error } = await supabaseClient.from("services").update({ name, duration, price }).eq("id", serviceId);
+    if (error) throw error;
+  },
+  async deleteService(serviceId) {
+    const { error } = await supabaseClient.from("services").delete().eq("id", serviceId);
+    if (error) throw error;
+  },
 
-function makeInitialDB() {
-  const extra1 = seedStudio("Bella Pele Estética", "bella-pele", { name: "Juliana Alves", email: "juliana@exemplo.com", password: "123456" }, "anual");
-  const extra2 = seedStudio("Espaço Renove", "espaco-renove", { name: "Patrícia Gomes", email: "patricia@exemplo.com", password: "123456" }, "mensal");
-  return {
-    studios: [DEMO_STUDIO, extra1, extra2],
-  };
-}
+  // --- APPOINTMENTS ---
+  async listAppointments(studioId) {
+    const { data, error } = await supabaseClient.from("appointments").select("*").eq("studio_id", studioId).order("date").order("time");
+    if (error || !data) return [];
+    return data.map(r => ({ id: r.id, clientId: r.client_id, serviceId: r.service_id, date: r.date, time: r.time, status: r.status }));
+  },
+  async createAppointment(studioId, { clientId, serviceId, date, time, status }) {
+    const { data, error } = await supabaseClient.from("appointments").insert({ studio_id: studioId, client_id: clientId, service_id: serviceId, date, time, status: status || "confirmado" }).select().single();
+    if (error) throw error;
+    return { id: data.id, clientId: data.client_id, serviceId: data.service_id, date: data.date, time: data.time, status: data.status };
+  },
+  async updateAppointment(apptId, patch) {
+    const payload = {};
+    if (patch.clientId !== undefined) payload.client_id = patch.clientId;
+    if (patch.serviceId !== undefined) payload.service_id = patch.serviceId;
+    if (patch.date !== undefined) payload.date = patch.date;
+    if (patch.time !== undefined) payload.time = patch.time;
+    if (patch.status !== undefined) payload.status = patch.status;
+    const { error } = await supabaseClient.from("appointments").update(payload).eq("id", apptId);
+    if (error) throw error;
+  },
+  async deleteAppointment(apptId) {
+    const { error } = await supabaseClient.from("appointments").delete().eq("id", apptId);
+    if (error) throw error;
+  },
+
+  // --- PAYMENTS (histórico da assinatura do estúdio) ---
+  async listPayments(studioId) {
+    const { data, error } = await supabaseClient.from("payments").select("*").eq("studio_id", studioId).order("paid_at", { ascending: false });
+    if (error || !data) return [];
+    return data.map(r => ({ id: r.id, label: r.label, amount: Number(r.amount), date: (r.paid_at || "").slice(0, 10), method: r.method, status: r.status }));
+  },
+  async createPayment(studioId, { label, amount, method, status, source }) {
+    const { error } = await supabaseClient.from("payments").insert({ studio_id: studioId, label, amount, method, status: status || "pago", source: source || "manual" });
+    if (error) throw error;
+  },
+
+  // --- PLATFORM ADMINS (login do painel administrativo) ---
+  async isPlatformAdmin(userId) {
+    const { data, error } = await supabaseClient.from("platform_admins").select("id").eq("id", userId).maybeSingle();
+    if (error) return false;
+    return !!data;
+  },
+};
+
 
 /* ============================================================
    GLOBAL APP CONTEXT
@@ -929,14 +1027,19 @@ function SignupScreen({ initialPlan, onBack, onComplete }) {
   const [payMethod, setPayMethod] = useState("pix");
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
+  const [error, setError] = useState("");
 
   const canStep1 = studioName.trim().length >= 2 && ownerName.trim().length >= 2 && email.includes("@") && password.length >= 6;
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     setLoading(true);
-    setTimeout(() => {
-      onComplete({ studioName, ownerName, email, password, plan, payMethod });
-    }, 900);
+    setError("");
+    try {
+      await onComplete({ studioName, ownerName, email: email.trim(), password, plan, payMethod });
+    } catch (e) {
+      setError(e?.message === "User already registered" ? "Este e-mail já está cadastrado. Tente entrar." : "Não foi possível concluir o cadastro. Tente novamente.");
+      setLoading(false);
+    }
   };
 
   return (
@@ -989,10 +1092,11 @@ function SignupScreen({ initialPlan, onBack, onComplete }) {
               </div>
               <span className="badge badge-success"><Icon name="shield" size={12} /> Pagamento seguro</span>
             </div>
+            {error && <div className="badge badge-danger" style={{ marginBottom: 14, display: "flex" }}>{error}</div>}
             <button className="btn btn-primary btn-block" onClick={handleFinish} disabled={loading} style={{ opacity: loading ? 0.7 : 1 }}>
               {loading ? "Confirmando assinatura..." : `Assinar e criar minha agenda`}
             </button>
-            <button className="btn btn-ghost btn-block" style={{ marginTop: 10 }} onClick={() => setStep(1)}>Voltar</button>
+            <button className="btn btn-ghost btn-block" style={{ marginTop: 10 }} onClick={() => setStep(1)} disabled={loading}>Voltar</button>
           </>
         )}
       </div>
@@ -1005,10 +1109,13 @@ function LoginScreen({ onBack, onLogin, onForgot, role }) {
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const submit = () => {
-    const ok = onLogin(email.trim(), password);
-    if (!ok) setError("E-mail ou senha incorretos.");
+  const submit = async () => {
+    setLoading(true);
+    const result = await onLogin(email.trim(), password);
+    setLoading(false);
+    if (!result.ok) setError(result.message || "E-mail ou senha incorretos.");
   };
 
   return (
@@ -1032,17 +1139,9 @@ function LoginScreen({ onBack, onLogin, onForgot, role }) {
             </button>
           </div>
         </Field>
-        <button className="btn btn-primary btn-block" onClick={submit} style={{ marginTop: 8 }}>Entrar</button>
-        {role !== "admin" && (
-          <p style={{ fontSize: 13, color: "var(--text-2)", textAlign: "center", marginTop: 16 }}>
-            Use <b style={{ color: "var(--text-1)" }}>mariana@exemplo.com</b> / <b style={{ color: "var(--text-1)" }}>123456</b> para testar a demonstração.
-          </p>
-        )}
-        {role === "admin" && (
-          <p style={{ fontSize: 13, color: "var(--text-2)", textAlign: "center", marginTop: 16 }}>
-            Use seu e-mail e senha de administrador para entrar.
-          </p>
-        )}
+        <button className="btn btn-primary btn-block" onClick={submit} disabled={loading} style={{ marginTop: 8, opacity: loading ? 0.7 : 1 }}>
+          {loading ? "Entrando..." : "Entrar"}
+        </button>
       </div>
     </AuthShell>
   );
@@ -1236,21 +1335,23 @@ function AgendaTab({ studio, updateStudio, onMenu }) {
   const getClient = (id) => studio.clients.find(c => c.id === id);
   const getService = (id) => studio.services.find(s => s.id === id);
 
-  const saveAppt = (data) => {
-    let appts;
+  const saveAppt = async (data) => {
     if (editing) {
-      appts = studio.appointments.map(a => a.id === editing.id ? { ...a, ...data } : a);
+      await DB.updateAppointment(editing.id, data);
+      const appts = studio.appointments.map(a => a.id === editing.id ? { ...a, ...data } : a);
+      updateStudio({ ...studio, appointments: appts });
       toast("Agendamento atualizado");
     } else {
-      appts = [...studio.appointments, { id: uid("apt"), ...data }];
+      const created = await DB.createAppointment(studio.id, data);
+      updateStudio({ ...studio, appointments: [...studio.appointments, created] });
       toast("Agendamento criado");
     }
-    updateStudio({ ...studio, appointments: appts });
     setModalOpen(false);
     setEditing(null);
   };
 
-  const removeAppt = (id) => {
+  const removeAppt = async (id) => {
+    await DB.deleteAppointment(id);
     updateStudio({ ...studio, appointments: studio.appointments.filter(a => a.id !== id) });
     toast("Agendamento removido", "info");
   };
@@ -1328,15 +1429,21 @@ function ClientsTab({ studio, updateStudio, onMenu }) {
 
   const filtered = studio.clients.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
 
-  const save = (data) => {
-    let clients;
-    if (editing) { clients = studio.clients.map(c => c.id === editing.id ? { ...c, ...data } : c); toast("Cliente atualizado"); }
-    else { clients = [...studio.clients, { id: uid("cli"), ...data }]; toast("Cliente cadastrado"); }
-    updateStudio({ ...studio, clients });
+  const save = async (data) => {
+    if (editing) {
+      await DB.updateClient(editing.id, data);
+      updateStudio({ ...studio, clients: studio.clients.map(c => c.id === editing.id ? { ...c, ...data } : c) });
+      toast("Cliente atualizado");
+    } else {
+      const created = await DB.createClient(studio.id, data);
+      updateStudio({ ...studio, clients: [...studio.clients, created] });
+      toast("Cliente cadastrado");
+    }
     setModalOpen(false); setEditing(null);
   };
 
-  const remove = (id) => {
+  const remove = async (id) => {
+    await DB.deleteClient(id);
     updateStudio({ ...studio, clients: studio.clients.filter(c => c.id !== id) });
     toast("Cliente removido", "info");
   };
@@ -1408,14 +1515,23 @@ function ServicesTab({ studio, updateStudio, onMenu }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
 
-  const save = (data) => {
-    let services;
-    if (editing) { services = studio.services.map(s => s.id === editing.id ? { ...s, ...data } : s); toast("Serviço atualizado"); }
-    else { services = [...studio.services, { id: uid("srv"), ...data }]; toast("Serviço cadastrado"); }
-    updateStudio({ ...studio, services });
+  const save = async (data) => {
+    if (editing) {
+      await DB.updateService(editing.id, data);
+      updateStudio({ ...studio, services: studio.services.map(s => s.id === editing.id ? { ...s, ...data } : s) });
+      toast("Serviço atualizado");
+    } else {
+      const created = await DB.createService(studio.id, data);
+      updateStudio({ ...studio, services: [...studio.services, created] });
+      toast("Serviço cadastrado");
+    }
     setModalOpen(false); setEditing(null);
   };
-  const remove = (id) => { updateStudio({ ...studio, services: studio.services.filter(s => s.id !== id) }); toast("Serviço removido", "info"); };
+  const remove = async (id) => {
+    await DB.deleteService(id);
+    updateStudio({ ...studio, services: studio.services.filter(s => s.id !== id) });
+    toast("Serviço removido", "info");
+  };
 
   return (
     <div>
@@ -1497,15 +1613,24 @@ function ConfigTab({ studio, updateStudio, onMenu }) {
   const toast = useToast();
   const [name, setName] = useState(studio.name);
   const [whatsapp, setWhatsapp] = useState(studio.whatsappNumber);
-  const publicLink = `agendaglow.app/${studio.slug}`;
+  const [saving, setSaving] = useState(false);
+  const publicUrl = `${window.location.origin}${window.location.pathname}#/book/${studio.slug}`;
 
-  const save = () => {
+  const save = async () => {
+    setSaving(true);
+    await DB.updateStudio(studio.id, { name, whatsappNumber: whatsapp });
     updateStudio({ ...studio, name, whatsappNumber: whatsapp });
+    setSaving(false);
     toast("Configurações salvas");
   };
 
-  const copyLink = () => {
-    toast("Link copiado para a área de transferência", "info");
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      toast("Link copiado para a área de transferência", "success");
+    } catch (e) {
+      toast("Não foi possível copiar. Copie manualmente.", "info");
+    }
   };
 
   return (
@@ -1518,7 +1643,7 @@ function ConfigTab({ studio, updateStudio, onMenu }) {
           <div>
             <label>Seu link de agendamento</label>
             <div style={{ display: "flex", gap: 8 }}>
-              <input type="text" readOnly value={publicLink} style={{ color: "var(--text-2)" }} />
+              <input type="text" readOnly value={publicUrl} style={{ color: "var(--text-2)" }} />
               <button className="btn btn-ghost" onClick={copyLink} aria-label="Copiar link"><Icon name="copy" size={16} /></button>
             </div>
           </div>
@@ -1549,7 +1674,7 @@ function ConfigTab({ studio, updateStudio, onMenu }) {
           </div>
         </div>
 
-        <button className="btn btn-primary" onClick={save}>Salvar alterações</button>
+        <button className="btn btn-primary" onClick={save} disabled={saving} style={{ opacity: saving ? 0.7 : 1 }}>{saving ? "Salvando..." : "Salvar alterações"}</button>
       </div>
     </div>
   );
@@ -1558,20 +1683,43 @@ function ConfigTab({ studio, updateStudio, onMenu }) {
 function StudioApp({ studio, setStudio, onLogout }) {
   const [active, setActive] = useState("agenda");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
+  const [fullStudio, setFullStudio] = useState(studio);
 
-  const updateStudio = (next) => setStudio(next);
+  // Carrega clientes, serviços, agendamentos e pagamentos reais do banco
+  // quando o painel do studio abre.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      setLoadingData(true);
+      const [clients, services, appointments, payments] = await Promise.all([
+        DB.listClients(studio.id),
+        DB.listServices(studio.id),
+        DB.listAppointments(studio.id),
+        DB.listPayments(studio.id),
+      ]);
+      if (!active) return;
+      setFullStudio({ ...studio, clients, services, appointments, payments });
+      setLoadingData(false);
+    })();
+    return () => { active = false; };
+  }, [studio.id]);
+
+  const updateStudio = (next) => { setFullStudio(next); setStudio(next); };
+
+  if (loadingData) return <LoadingScreen />;
 
   const tabs = {
-    agenda: <AgendaTab studio={studio} updateStudio={updateStudio} onMenu={() => setMobileOpen(true)} />,
-    clientes: <ClientsTab studio={studio} updateStudio={updateStudio} onMenu={() => setMobileOpen(true)} />,
-    servicos: <ServicesTab studio={studio} updateStudio={updateStudio} onMenu={() => setMobileOpen(true)} />,
-    pagamentos: <PaymentsTab studio={studio} onMenu={() => setMobileOpen(true)} />,
-    config: <ConfigTab studio={studio} updateStudio={updateStudio} onMenu={() => setMobileOpen(true)} />,
+    agenda: <AgendaTab studio={fullStudio} updateStudio={updateStudio} onMenu={() => setMobileOpen(true)} />,
+    clientes: <ClientsTab studio={fullStudio} updateStudio={updateStudio} onMenu={() => setMobileOpen(true)} />,
+    servicos: <ServicesTab studio={fullStudio} updateStudio={updateStudio} onMenu={() => setMobileOpen(true)} />,
+    pagamentos: <PaymentsTab studio={fullStudio} onMenu={() => setMobileOpen(true)} />,
+    config: <ConfigTab studio={fullStudio} updateStudio={updateStudio} onMenu={() => setMobileOpen(true)} />,
   };
 
   return (
     <div style={{ display: "flex", width: "100%", maxWidth: "100vw", overflowX: "hidden" }}>
-      <StudioSidebar active={active} setActive={setActive} studio={studio} onLogout={onLogout} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+      <StudioSidebar active={active} setActive={setActive} studio={fullStudio} onLogout={onLogout} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
       <div className="main-content" style={{ flex: 1, marginLeft: 250 }}>
         {tabs[active]}
       </div>
@@ -1586,7 +1734,6 @@ function AdminSidebar({ active, setActive, onLogout, mobileOpen, setMobileOpen }
   const items = [
     { id: "visao", label: "Visão geral", icon: "chart" },
     { id: "studios", label: "Studios assinantes", icon: "building" },
-    { id: "acesso", label: "Acessos gratuitos", icon: "star" },
     { id: "planos", label: "Planos e preços", icon: "crown" },
     { id: "pagamentos", label: "Pagamentos recebidos", icon: "money" },
   ];
@@ -1641,30 +1788,15 @@ function billingStatus(s) {
 const billingLabel = { ativo:"Em dia", vencendo:"Vence em breve", pendente:"Pagamento pendente", bloqueado:"Bloqueado", cancelado:"Cancelado" };
 const billingBadge = { ativo:"badge-success", vencendo:"badge-warning", pendente:"badge-gold", bloqueado:"badge-danger", cancelado:"badge-gray" };
 
-function AdminOverview({ studios, setStudios, onMenu }) {
+function AdminOverview({ studios, onMenu }) {
   const stats = platformStats(studios);
   const recentStudios = studios.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5);
-  const demoCount = studios.filter(s => s.isDemo).length;
   const statusCount = { ativo:0, vencendo:0, pendente:0, bloqueado:0, cancelado:0 };
   studios.forEach(s => { const b = billingStatus(s); statusCount[b] = (statusCount[b]||0)+1; });
-
-  const limparDemos = () => {
-    if (!window.confirm(`Remover as ${demoCount} conta(s) de demonstração permanentemente?`)) return;
-    setStudios(studios.filter(s => !s.isDemo));
-  };
 
   return (
     <div>
       <TopBar title="Visão geral da plataforma" onMenu={onMenu} />
-
-      {demoCount > 0 && (
-        <div className="card" style={{background:"rgba(240,180,41,0.06)",border:"1px solid rgba(240,180,41,0.25)",padding:14,marginBottom:20,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
-          <p style={{fontSize:13.5,color:"var(--text-1)"}}><b style={{color:"#f0b429"}}>⚠ {demoCount}</b> conta{demoCount>1?"s":""} de demonstração ativas. Remova antes de publicar.</p>
-          <button className="btn btn-sm" style={{background:"rgba(240,180,41,0.15)",color:"#f0b429",border:"1px solid rgba(240,180,41,0.3)"}} onClick={limparDemos}>
-            <Icon name="trash" size={13}/> Remover demonstrações
-          </button>
-        </div>
-      )}
 
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 26 }}>
         <StatCard icon="building" label="Studios ativos" value={stats.active} tone="lilac" />
@@ -1689,6 +1821,9 @@ function AdminOverview({ studios, setStudios, onMenu }) {
       <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 18 }} className="admin-grid">
         <div className="card">
           <p style={{ fontWeight: 600, marginBottom: 16 }}>Studios cadastrados recentemente</p>
+          {recentStudios.length === 0 ? (
+            <p style={{ fontSize: 13.5, color: "var(--text-2)" }}>Nenhum studio cadastrado ainda.</p>
+          ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {recentStudios.map(s => {
               const bs = billingStatus(s);
@@ -1704,6 +1839,7 @@ function AdminOverview({ studios, setStudios, onMenu }) {
               );
             })}
           </div>
+          )}
         </div>
         <div className="card">
           <p style={{ fontWeight: 600, marginBottom: 16 }}>Distribuição de planos</p>
@@ -1727,7 +1863,7 @@ function AdminOverview({ studios, setStudios, onMenu }) {
           </div>
           <div className="card" style={{ background: "var(--bg-1)", marginTop: 18, padding: 14 }}>
             <p style={{ fontSize: 13, color: "var(--text-2)" }}>Ticket médio por studio / mês</p>
-            <p className="serif" style={{ fontSize: 22, fontWeight: 500, marginTop: 4 }}>{fmtBRL(stats.total ? stats.mrr / stats.active : 0)}</p>
+            <p className="serif" style={{ fontSize: 22, fontWeight: 500, marginTop: 4 }}>{fmtBRL(stats.active ? stats.mrr / stats.active : 0)}</p>
           </div>
         </div>
       </div>
@@ -1765,7 +1901,6 @@ function StudioDetailModal({ studio, onClose, onChangeStatus, onDelete, onRenewF
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
         <span className="badge badge-lilac">Plano {studio.plan === "anual" ? "anual" : "mensal"}</span>
         <span className={`badge ${billingBadge[bs]}`}>{billingLabel[bs]}</span>
-        {studio.isDemo && <span className="badge badge-warning">Demonstração</span>}
       </div>
       {(bs==="bloqueado"||bs==="pendente") && (
         <div className="card" style={{background:"rgba(232,132,154,0.06)",border:"1px solid rgba(232,132,154,0.25)",padding:12,marginBottom:14}}>
@@ -1804,11 +1939,6 @@ function StudioDetailModal({ studio, onClose, onChangeStatus, onDelete, onRenewF
         ))}
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap:"wrap" }}>
-        {studio.plan === "gratuito" && (
-          <button className="btn btn-gold" style={{ flex: 1 }} onClick={handleRenew}>
-            <Icon name="star" size={14}/> Renovar acesso gratuito (+30 dias)
-          </button>
-        )}
         {studio.planStatus === "ativo" ? (
           <button className="btn btn-ghost" style={{ color: "var(--danger)", flex:1 }} onClick={() => onChangeStatus(studio.id, "cancelado_plano")}>Cancelar assinatura</button>
         ) : (
@@ -1822,7 +1952,7 @@ function StudioDetailModal({ studio, onClose, onChangeStatus, onDelete, onRenewF
   );
 }
 
-function AdminStudiosTab({ studios, setStudios, onMenu }) {
+function AdminStudiosTab({ studios, onChangeStatus, onDeleteStudio, onRenewFree, onMenu }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("todos");
   const [filterStatus, setFilterStatus] = useState("todos");
@@ -1834,19 +1964,18 @@ function AdminStudiosTab({ studios, setStudios, onMenu }) {
     return s.name.toLowerCase().includes(search.toLowerCase()) || s.owner.email.toLowerCase().includes(search.toLowerCase());
   });
 
-  const changeStatus = (id, status) => {
-    setStudios(studios.map(s => s.id === id ? { ...s, planStatus: status } : s));
+  const changeStatus = async (id, status) => {
+    await onChangeStatus(id, status);
     setSelected(null);
   };
 
-  // Renova o acesso gratuito por mais 30 dias a partir de hoje, sem precisar excluir e recriar a conta.
-  const renewFree = (id) => {
-    setStudios(studios.map(s => s.id === id ? { ...s, nextBilling: addDays(todayISO(), 30), planStatus: "ativo" } : s));
+  const renewFree = async (id) => {
+    await onRenewFree(id);
     setSelected(prev => prev && prev.id === id ? { ...prev, nextBilling: addDays(todayISO(), 30), planStatus: "ativo" } : prev);
   };
 
-  const deleteStudio = (id) => {
-    setStudios(studios.filter(s => s.id !== id));
+  const deleteStudio = async (id) => {
+    await onDeleteStudio(id);
     setSelected(null);
   };
 
@@ -1879,7 +2008,7 @@ function AdminStudiosTab({ studios, setStudios, onMenu }) {
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <Avatar name={s.name} size={32} />
                       <div>
-                        <p style={{ fontWeight: 500 }}>{s.name}{s.isDemo&&<span className="badge badge-warning" style={{marginLeft:6,fontSize:10,padding:"2px 6px"}}>Demo</span>}</p>
+                        <p style={{ fontWeight: 500 }}>{s.name}</p>
                         <p style={{ fontSize: 12, color: "var(--text-2)" }}>{s.owner.email}</p>
                       </div>
                     </div>
@@ -1972,103 +2101,54 @@ function AdminPaymentsTab({ studios, onMenu }) {
 }
 
 
-function FreeAccessTab({ onMenu }) {
-  const toast = useToast();
-  const [list, setList] = React.useState(() => getFreeList());
-  const [email, setEmail] = React.useState("");
-  const [nome, setNome] = React.useState("");
 
-  const add = () => {
-    const e = email.trim().toLowerCase();
-    if (!e.includes("@")) return;
-    if (list.find(x => x.email === e)) { toast("Este e-mail já está na lista.", "error"); return; }
-    const next = [...list, { email: e, nome: nome.trim() || e, addedAt: todayISO() }];
-    setList(next);
-    saveFreeList(next);
-    setEmail(""); setNome("");
-    toast("Acesso gratuito liberado para " + e);
-  };
 
-  const remove = (e) => {
-    const next = list.filter(x => x.email !== e);
-    setList(next);
-    saveFreeList(next);
-    toast("Acesso removido", "info");
-  };
-
-  return (
-    <div>
-      <TopBar title="Acessos gratuitos" onMenu={onMenu} />
-      <p style={{ color: "var(--text-2)", marginBottom: 22, maxWidth: 520, fontSize: 14.5 }}>
-        Libere acesso gratuito para quem você quiser — sua esposa, sócios, amigos. Eles criam a conta normalmente e o sistema aceita sem cobrar.
-      </p>
-      <div className="card" style={{ marginBottom: 24, padding: 20 }}>
-        <p style={{ fontWeight: 600, marginBottom: 14, fontSize: 14 }}>Liberar novo acesso gratuito</p>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 180 }}>
-            <label>Nome (opcional)</label>
-            <input type="text" placeholder="Ex: Minha esposa" value={nome} onChange={e => setNome(e.target.value)} />
-          </div>
-          <div style={{ flex: 2, minWidth: 220 }}>
-            <label>E-mail</label>
-            <input type="email" placeholder="email@exemplo.com" value={email} onChange={e => setEmail(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && add()} />
-          </div>
-          <div style={{ display: "flex", alignItems: "flex-end" }}>
-            <button className="btn btn-primary" onClick={add} disabled={!email.includes("@")} style={{ opacity: email.includes("@") ? 1 : 0.5 }}>
-              <Icon name="plus" size={15} /> Liberar acesso
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {list.length === 0 ? (
-        <EmptyState icon="star" title="Nenhum acesso gratuito ainda" body="Adicione o e-mail de quem você quer liberar acima." />
-      ) : (
-        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-          <div className="table-wrap">
-          <table>
-            <thead><tr><th>Nome</th><th>E-mail</th><th>Liberado em</th><th></th></tr></thead>
-            <tbody>
-              {list.map(x => (
-                <tr key={x.email}>
-                  <td style={{ fontWeight: 500 }}>{x.nome}</td>
-                  <td style={{ color: "var(--text-2)" }}>{x.email}</td>
-                  <td style={{ color: "var(--text-2)" }}>{fmtDate(x.addedAt)}</td>
-                  <td>
-                    <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)", padding: 6 }} onClick={() => remove(x.email)}>
-                      <Icon name="trash" size={14} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-        </div>
-      )}
-      <div className="card" style={{ marginTop: 20, background: "rgba(199,125,255,0.06)", border: "1px solid rgba(199,125,255,0.2)" }}>
-        <div style={{ display: "flex", gap: 10 }}>
-          <span style={{ color: "var(--lilac)", flexShrink: 0 }}><Icon name="info" size={18} /></span>
-          <p style={{ fontSize: 13.5, color: "var(--text-1)", lineHeight: 1.7 }}>
-            A pessoa com acesso gratuito entra no site normalmente e clica em <b>"Criar minha agenda"</b>.
-            Na hora de pagar, o sistema vai reconhecer o e-mail dela e liberar sem cobrar nada.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AdminApp({ studios, setStudios, onLogout }) {
+function AdminApp({ onLogout }) {
   const [active, setActive] = useState("visao");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [studios, setStudios] = useState([]);
   const menuProps = { onMenu: () => setMobileOpen(true) };
 
+  const loadStudios = async () => {
+    setLoading(true);
+    const base = await DB.listAllStudios();
+    // Carrega clientes e pagamentos de cada studio para alimentar as métricas do admin.
+    const full = await Promise.all(base.map(async (s) => {
+      const [clients, payments] = await Promise.all([DB.listClients(s.id), DB.listPayments(s.id)]);
+      return { ...s, clients, payments };
+    }));
+    setStudios(full);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadStudios(); }, []);
+
+  const setStudiosAndSync = (updater) => {
+    setStudios(prev => typeof updater === "function" ? updater(prev) : updater);
+  };
+
+  const changeStatus = async (id, status) => {
+    await DB.updateStudio(id, { planStatus: status });
+    setStudiosAndSync(prev => prev.map(s => s.id === id ? { ...s, planStatus: status } : s));
+  };
+
+  const renewFree = async (id) => {
+    const nextBilling = addDays(todayISO(), 30);
+    await DB.updateStudio(id, { nextBilling, planStatus: "ativo" });
+    setStudiosAndSync(prev => prev.map(s => s.id === id ? { ...s, nextBilling, planStatus: "ativo" } : s));
+  };
+
+  const deleteStudioAdmin = async (id) => {
+    await DB.deleteStudio(id);
+    setStudiosAndSync(prev => prev.filter(s => s.id !== id));
+  };
+
+  if (loading) return <LoadingScreen />;
+
   const tabs = {
-    visao: <AdminOverview studios={studios} setStudios={setStudios} {...menuProps} />,
-    studios: <AdminStudiosTab studios={studios} setStudios={setStudios} {...menuProps} />,
-    acesso: <FreeAccessTab {...menuProps} />,
+    visao: <AdminOverview studios={studios} {...menuProps} />,
+    studios: <AdminStudiosTab studios={studios} onChangeStatus={changeStatus} onDeleteStudio={deleteStudioAdmin} onRenewFree={renewFree} {...menuProps} />,
     planos: <AdminPlansTab {...menuProps} />,
     pagamentos: <AdminPaymentsTab studios={studios} {...menuProps} />,
   };
@@ -2086,24 +2166,61 @@ function AdminApp({ studios, setStudios, onLogout }) {
 /* ============================================================
    PUBLIC BOOKING PAGE — what the studio's end clients see
    ============================================================ */
-function PublicBookingPage({ studio, onBookingComplete }) {
-  const [serviceId, setServiceId] = useState(studio.services[0]?.id || "");
+function PublicBookingPage({ slug, onGoLanding }) {
+  const [loading, setLoading] = useState(true);
+  const [studio, setStudio] = useState(null);
+  const [services, setServices] = useState([]);
+  const [appointments, setAppointments] = useState([]);
+  const [serviceId, setServiceId] = useState("");
   const [date, setDate] = useState(todayISO());
   const [time, setTime] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const found = await DB.getStudioBySlug(slug);
+      if (!found) { setLoading(false); return; }
+      const [svcs, appts] = await Promise.all([DB.listServices(found.id), DB.listAppointments(found.id)]);
+      setStudio(found);
+      setServices(svcs);
+      setAppointments(appts);
+      setServiceId(svcs[0]?.id || "");
+      setLoading(false);
+    })();
+  }, [slug]);
+
+  if (loading) return <LoadingScreen />;
+
+  if (!studio) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <EmptyState icon="alertTriangle" title="Studio não encontrado" body="Este link de agendamento não existe ou foi removido." action={
+          <button className="btn btn-primary" onClick={() => { window.location.hash = ""; onGoLanding(); }}>Voltar para o início</button>
+        } />
+      </div>
+    );
+  }
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(todayISO(), i));
-  const takenTimes = studio.appointments.filter(a => a.date === date).map(a => a.time);
+  const takenTimes = appointments.filter(a => a.date === date).map(a => a.time);
   const slots = ["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00"];
-  const service = studio.services.find(s => s.id === serviceId);
+  const service = services.find(s => s.id === serviceId);
 
   const canBook = serviceId && date && time && name.trim().length >= 2 && phone.trim().length >= 8;
 
-  const confirm = () => {
-    onBookingComplete({ serviceId, date, time, name, phone });
-    setDone(true);
+  const confirm = async () => {
+    setSubmitting(true);
+    try {
+      const client = await DB.createClient(studio.id, { name, phone });
+      await DB.createAppointment(studio.id, { clientId: client.id, serviceId, date, time, status: "confirmado" });
+      setDone(true);
+    } catch (e) {
+      setSubmitting(false);
+    }
   };
 
   if (done) {
@@ -2137,8 +2254,11 @@ function PublicBookingPage({ studio, onBookingComplete }) {
 
       <div className="container" style={{ maxWidth: 560, paddingTop: 32 }}>
         <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-2)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 12 }}>1. Escolha o serviço</p>
+        {services.length === 0 ? (
+          <p style={{ fontSize: 13.5, color: "var(--text-2)", marginBottom: 28 }}>Este studio ainda não cadastrou serviços.</p>
+        ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 28 }}>
-          {studio.services.map(s => (
+          {services.map(s => (
             <button key={s.id} onClick={() => setServiceId(s.id)} style={{
               display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 16px", borderRadius: 12, textAlign: "left",
               border: serviceId === s.id ? "2px solid var(--lilac)" : "1px solid var(--line-strong)",
@@ -2152,6 +2272,7 @@ function PublicBookingPage({ studio, onBookingComplete }) {
             </button>
           ))}
         </div>
+        )}
 
         <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-2)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 12 }}>2. Escolha o dia</p>
         <div style={{ display: "flex", gap: 8, overflowX: "auto", marginBottom: 24, paddingBottom: 4 }}>
@@ -2192,8 +2313,8 @@ function PublicBookingPage({ studio, onBookingComplete }) {
           Seu WhatsApp fica salvo para o studio confirmar o horário com você, se precisar.
         </div>
 
-        <button className="btn btn-primary btn-block" disabled={!canBook} style={{ opacity: canBook ? 1 : 0.5 }} onClick={confirm}>
-          Confirmar agendamento
+        <button className="btn btn-primary btn-block" disabled={!canBook || submitting} style={{ opacity: (canBook && !submitting) ? 1 : 0.5 }} onClick={confirm}>
+          {submitting ? "Confirmando..." : "Confirmar agendamento"}
         </button>
       </div>
     </div>
@@ -2203,13 +2324,6 @@ function PublicBookingPage({ studio, onBookingComplete }) {
 /* ============================================================
    ROOT APP — routing between landing, auth, studio app, admin app
    ============================================================ */
-const STORAGE_KEY = "agendaglow:db:v1";
-const SEEDED_KEY = "agendaglow:seeded:v1";
-const SESSION_KEY = "agendaglow:session:v2";
-function saveSession(s){ try{localStorage.setItem(SESSION_KEY,JSON.stringify(s));}catch(e){} }
-function loadSession(){ try{const r=localStorage.getItem(SESSION_KEY);return r?JSON.parse(r):null;}catch(e){return null;} }
-function clearSession(){ try{localStorage.removeItem(SESSION_KEY);}catch(e){} }
-
 function LoadingScreen() {
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -2221,55 +2335,55 @@ function LoadingScreen() {
 
 function Root() {
   const [booted, setBooted] = useState(false);
-  const [studios, setStudios] = useState([]);
   const [view, setView] = useState("landing"); // landing | signup | login | adminLogin | studio | admin | public
   const [signupPlan, setSignupPlan] = useState("mensal");
-  const [session, setSession] = useState(null); // { type: 'studio'|'admin', studioId }
+  const [authUser, setAuthUser] = useState(null); // usuário logado no Supabase Auth
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [currentStudio, setCurrentStudio] = useState(null);
   const [publicSlug, setPublicSlug] = useState(null);
   const [toast, setToast] = useState(null);
 
-  // boot: load from persistent storage, seed ONLY on the very first run ever.
-  // FIX: antes, um array de studios vazio (ex: depois de "Remover demonstrações"
-  // remover tudo) era tratado como "nunca inicializado" e o app recriava as
-  // contas de demonstração sozinho. Agora guardamos uma flag separada
-  // (agendaglow:seeded:v1) que marca "já inicializei alguma vez" — uma vez
-  // marcada, um array vazio é respeitado como vazio de verdade, e os
-  // clientes/studios de teste nunca mais voltam.
+  // boot: lê a rota (link público de agendamento) e a sessão real do Supabase Auth.
   useEffect(() => {
     (async () => {
-      const alreadySeeded = await Store.get(SEEDED_KEY, false);
-      const saved = await Store.get(STORAGE_KEY, null);
-      if (alreadySeeded) {
-        setStudios(saved && saved.studios ? saved.studios : []);
-      } else if (saved && saved.studios && saved.studios.length) {
-        // Banco já existia (versão antiga) mas a flag ainda não — apenas marca, não semeia de novo.
-        setStudios(saved.studios);
-        await Store.set(SEEDED_KEY, true);
-      } else {
-        const init = makeInitialDB();
-        setStudios(init.studios);
-        await Store.set(STORAGE_KEY, init);
-        await Store.set(SEEDED_KEY, true);
-      }
-      // Restaurar sessão persistente
-      const savedSession = loadSession();
       const hash = window.location.hash;
       if (hash.startsWith("#/book/")) {
         setPublicSlug(hash.replace("#/book/", ""));
         setView("public");
-      } else if (savedSession) {
-        setSession(savedSession);
-        setView(savedSession.type === "admin" ? "admin" : "studio");
+        setBooted(true);
+        return;
+      }
+      const { data } = await supabaseClient.auth.getSession();
+      const user = data?.session?.user || null;
+      if (user) {
+        await resolveSession(user);
       }
       setBooted(true);
     })();
+
+    const { data: sub } = supabaseClient.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_OUT") {
+        setAuthUser(null); setIsAdmin(false); setCurrentStudio(null);
+      }
+    });
+    return () => sub?.subscription?.unsubscribe();
   }, []);
 
-  // persist whenever studios change (after boot)
-  useEffect(() => {
-    if (!booted) return;
-    Store.set(STORAGE_KEY, { studios });
-  }, [studios, booted]);
+  // Dado um usuário autenticado, descobre se é admin da plataforma ou dono de um estúdio.
+  const resolveSession = async (user) => {
+    setAuthUser(user);
+    const admin = await DB.isPlatformAdmin(user.id);
+    if (admin) {
+      setIsAdmin(true);
+      setView("admin");
+      return;
+    }
+    const studio = await DB.getStudioByOwner(user.id, user.email);
+    if (studio) {
+      setCurrentStudio(studio);
+      setView("studio");
+    }
+  };
 
   useEffect(() => {
     if (toast) {
@@ -2280,100 +2394,79 @@ function Root() {
 
   if (!booted) return <LoadingScreen />;
 
-  const goLanding = () => { setView("landing"); setSession(null); clearSession(); };
+  const goLanding = () => { setView("landing"); };
   const goSignup = (plan) => { setSignupPlan(plan && typeof plan === "string" ? plan : "mensal"); setView("signup"); };
   const goLogin = () => setView("login");
   const goAdminLogin = () => setView("adminLogin");
 
-  const handleSignupComplete = ({ studioName, ownerName, email, password, plan, payMethod }) => {
-    const isFree = getFreeList().some(x => x.email === email.trim().toLowerCase());
+  const handleSignupComplete = async ({ studioName, ownerName, email, password, plan, payMethod }) => {
+    const { data, error } = await supabaseClient.auth.signUp({
+      email, password,
+      options: { data: { full_name: ownerName } },
+    });
+    if (error) throw error;
+    const user = data.user;
+    if (!user) throw new Error("Não foi possível criar a conta. Verifique seu e-mail para confirmar o cadastro.");
+
     const slugBase = slugify(studioName) || "studio";
-    let slug = slugBase, n = 1;
-    while (studios.some(s => s.slug === slug)) { slug = `${slugBase}-${n++}`; }
-    const newStudio = seedStudio(studioName, slug, { name: ownerName, email, password }, plan);
-    newStudio.payments = [{
-      id: uid("pay"),
-      label: isFree ? "Acesso gratuito liberado pelo administrador" : `Assinatura Agenda Glow — Plano ${plan === "anual" ? "Anual" : "Mensal"}`,
-      amount: isFree ? 0 : (plan === "anual" ? PLAN_PRICES.anual : PLAN_PRICES.mensal),
-      date: todayISO(), method: isFree ? "gratuito" : payMethod, status: "pago",
-    }];
-    if (isFree) {
-      newStudio.plan = "gratuito";
-      newStudio.planStatus = "ativo";
-      // FIX: seedStudio() sempre calcula nextBilling pensando em plano mensal/anual
-      // pago (vencimento em 1 dia para "mensal"). Acesso gratuito liberado pelo
-      // admin precisa de um prazo de verdade — 30 dias — senão a pessoa vê
-      // "vence em breve" e fica bloqueada quase no dia seguinte.
-      newStudio.nextBilling = addDays(todayISO(), 30);
+    let slug = slugBase, n = 1, exists = true;
+    while (exists) {
+      const found = await DB.getStudioBySlug(slug);
+      if (!found) { exists = false; } else { slug = `${slugBase}-${n++}`; }
     }
-    // give the new studio a clean slate (no demo clients/appointments) except sample services
-    newStudio.clients = [];
-    newStudio.appointments = [];
-    // FIX: seedStudio() sempre marca isDemo:true porque também é usada para criar
-    // as contas de demonstração iniciais. Um cadastro real feito por um cliente de
-    // verdade (via "Criar minha agenda") NÃO é demonstração — sem essa correção,
-    // contas de clientes reais ficavam com a etiqueta "Demonstração" e corriam o
-    // risco de serem apagadas ao clicar em "Remover demonstrações".
-    newStudio.isDemo = false;
-    const next = [...studios, newStudio];
-    setStudios(next);
-    setSession({ type: "studio", studioId: newStudio.id });
+
+    const studio = await DB.createStudio({ ownerId: user.id, ownerEmail: email, ownerName, studioName, slug, plan });
+    await DB.createPayment(studio.id, {
+      label: `Assinatura Agenda Glow — Plano ${plan === "anual" ? "Anual" : "Mensal"}`,
+      amount: plan === "anual" ? PLAN_PRICES.anual : PLAN_PRICES.mensal,
+      method: payMethod, status: "pago", source: "manual",
+    });
+
+    setCurrentStudio(studio);
+    setAuthUser(user);
     setView("studio");
     setToast({ msg: `Bem-vinda à Agenda Glow! Plano ${plan === "anual" ? "anual" : "mensal"} ativado.`, type: "success", key: uid("t") });
   };
 
-  const handleStudioLogin = (email, password) => {
-    const studio = studios.find(s => s.owner.email.toLowerCase() === email.toLowerCase() && s.owner.password === password);
-    if (!studio) return false;
-    const ns = { type: "studio", studioId: studio.id };
-    setSession(ns); saveSession(ns);
+  const handleStudioLogin = async (email, password) => {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error || !data.user) return { ok: false, message: "E-mail ou senha incorretos." };
+    const studio = await DB.getStudioByOwner(data.user.id, data.user.email);
+    if (!studio) {
+      await supabaseClient.auth.signOut();
+      return { ok: false, message: "Esta conta não tem nenhum studio cadastrado." };
+    }
+    setAuthUser(data.user);
+    setCurrentStudio(studio);
     setView("studio");
-    return true;
+    return { ok: true };
   };
 
-  const handleAdminLogin = (email, password) => {
-    if (email.toLowerCase() === ADMIN_CRED.email && password === ADMIN_CRED.password) {
-      const ns = { type: "admin" };
-      setSession(ns); saveSession(ns);
-      setView("admin");
-      return true;
+  const handleAdminLogin = async (email, password) => {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error || !data.user) return { ok: false, message: "E-mail ou senha incorretos." };
+    const admin = await DB.isPlatformAdmin(data.user.id);
+    if (!admin) {
+      await supabaseClient.auth.signOut();
+      return { ok: false, message: "Esta conta não tem acesso administrativo." };
     }
-    return false;
+    setAuthUser(data.user);
+    setIsAdmin(true);
+    setView("admin");
+    return { ok: true };
   };
 
-  const logout = () => { setSession(null); clearSession(); setView("landing"); };
-
-  const currentStudio = session?.type === "studio" ? studios.find(s => s.id === session.studioId) : null;
-  const updateCurrentStudio = (next) => setStudios(studios.map(s => s.id === next.id ? next : s));
-
-  const publicStudio = publicSlug ? studios.find(s => s.slug === publicSlug) : null;
-
-  const handlePublicBooking = ({ serviceId, date, time, name, phone }) => {
-    if (!publicStudio) return;
-    let clients = publicStudio.clients;
-    let client = clients.find(c => c.phone === phone);
-    if (!client) {
-      client = { id: uid("cli"), name, phone };
-      clients = [...clients, client];
-    }
-    const appt = { id: uid("apt"), clientId: client.id, serviceId, date, time, status: "confirmado" };
-    const next = { ...publicStudio, clients, appointments: [...publicStudio.appointments, appt] };
-    setStudios(studios.map(s => s.id === next.id ? next : s));
+  const logout = async () => {
+    await supabaseClient.auth.signOut();
+    setAuthUser(null); setIsAdmin(false); setCurrentStudio(null);
+    setView("landing");
   };
 
   const ctx = { toast, setToast };
 
   let content;
-  if (view === "public" && publicStudio) {
-    content = <PublicBookingPage studio={publicStudio} onBookingComplete={handlePublicBooking} />;
-  } else if (view === "public" && !publicStudio) {
-    content = (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-        <EmptyState icon="alertTriangle" title="Studio não encontrado" body="Este link de agendamento não existe ou foi removido." action={
-          <button className="btn btn-primary" onClick={() => { window.location.hash = ""; goLanding(); }}>Voltar para o início</button>
-        } />
-      </div>
-    );
+  if (view === "public") {
+    content = <PublicBookingPage slug={publicSlug} onGoLanding={goLanding} />;
   } else if (view === "signup") {
     content = <SignupScreen initialPlan={signupPlan} onBack={goLanding} onComplete={handleSignupComplete} />;
   } else if (view === "login") {
@@ -2381,9 +2474,9 @@ function Root() {
   } else if (view === "adminLogin") {
     content = <LoginScreen onBack={goLanding} onLogin={handleAdminLogin} role="admin" />;
   } else if (view === "studio" && currentStudio) {
-    content = <StudioApp studio={currentStudio} setStudio={updateCurrentStudio} onLogout={logout} />;
-  } else if (view === "admin" && session?.type === "admin") {
-    content = <AdminApp studios={studios} setStudios={setStudios} onLogout={logout} />;
+    content = <StudioApp studio={currentStudio} setStudio={setCurrentStudio} onLogout={logout} />;
+  } else if (view === "admin" && isAdmin) {
+    content = <AdminApp onLogout={logout} />;
   } else {
     content = <LandingPage onLogin={goLogin} onSignup={goSignup} onAdminLogin={goAdminLogin} />;
   }
