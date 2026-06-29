@@ -83,10 +83,8 @@ export default async function handler(req, res) {
     const today = todayISO();
 
     switch (eventType) {
-      case "order_approved":
       case "compra_aprovada":
-      case "subscription_renewed":
-      case "assinatura_renovada": {
+      case "subscription_renewed": {
         const nextBilling = addDays(today, isAnnual ? 365 : 30);
         await supabaseRequest(`studios?id=eq.${studio.id}`, {
           method: "PATCH",
@@ -111,21 +109,17 @@ export default async function handler(req, res) {
         });
         break;
       }
-      case "order_refused":
       case "compra_recusada":
-      case "subscription_late":
-      case "assinatura_atrasada": {
+      case "subscription_late": {
         await supabaseRequest(`studios?id=eq.${studio.id}`, {
           method: "PATCH",
           body: JSON.stringify({ plan_status: "pendente" }),
         });
         break;
       }
-      case "order_refunded":
-      case "reembolso":
+      case "compra_reembolsada":
       case "chargeback":
-      case "subscription_canceled":
-      case "assinatura_cancelada": {
+      case "subscription_canceled": {
         await supabaseRequest(`studios?id=eq.${studio.id}`, {
           method: "PATCH",
           body: JSON.stringify({ plan_status: "cancelado" }),
