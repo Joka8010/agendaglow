@@ -372,7 +372,7 @@ const initials = (name) => name.split(" ").filter(Boolean).slice(0, 2).map(w => 
    SUPABASE — conexão com o banco de dados real na nuvem
    ============================================================ */
 const SUPABASE_URL = "https://zmvutobctfjtzkuzoqqm.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptdnV0b2JjdGZqdHprdXpvcXFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1OTM2OTQsImV4cCI6MjA5ODE2OTY5NH0.OPZiJ4Y6zWbxSk8bSwvvUlFup_WtIgAAaCT7h9hSzE4";
+const SUPABASE_ANON_KEY = "sb_publishable_6RptizG_CWqlJyOxE4i65g_UjR8VYvC";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* ============================================================
@@ -1149,6 +1149,84 @@ function LoginScreen({ onBack, onLogin, onForgot, role }) {
         </Field>
         <button className="btn btn-primary btn-block" onClick={submit} disabled={loading} style={{ marginTop: 8, opacity: loading ? 0.7 : 1 }}>
           {loading ? "Entrando..." : "Entrar"}
+        </button>
+      </div>
+    </AuthShell>
+  );
+}
+
+function ActivateAccountScreen({ onBack, onActivated }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const canSubmit = email.includes("@") && password.length >= 6 && password === confirmPassword;
+
+  const submit = async () => {
+    setError("");
+    if (password !== confirmPassword) { setError("As senhas não coincidem."); return; }
+    setLoading(true);
+    try {
+      const resp = await fetch("/api/activate-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+      const json = await resp.json();
+      if (!resp.ok) { setError(json.error || "Não foi possível ativar sua conta."); setLoading(false); return; }
+      setDone(true);
+      setLoading(false);
+    } catch (e) {
+      setError("Erro de conexão. Tente novamente.");
+      setLoading(false);
+    }
+  };
+
+  if (done) {
+    return (
+      <AuthShell onBack={onBack}>
+        <div className="card" style={{ padding: 32, textAlign: "center" }}>
+          <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(127,217,168,0.14)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px", color: "var(--success)" }}>
+            <Icon name="check" size={26} />
+          </div>
+          <h2 className="serif" style={{ fontSize: 22, marginBottom: 10 }}>Senha criada com sucesso!</h2>
+          <p style={{ color: "var(--text-1)", marginBottom: 20, fontSize: 14.5 }}>
+            Agora você já pode entrar na sua agenda usando esse e-mail e a senha que você acabou de criar.
+          </p>
+          <button className="btn btn-primary btn-block" onClick={onActivated}>Entrar na minha agenda</button>
+        </div>
+      </AuthShell>
+    );
+  }
+
+  return (
+    <AuthShell onBack={onBack}>
+      <div className="card" style={{ padding: 32 }}>
+        <h2 className="serif" style={{ fontSize: 24, fontWeight: 500, marginBottom: 6 }}>Crie sua senha de acesso</h2>
+        <p style={{ fontSize: 14, color: "var(--text-2)", marginBottom: 24 }}>
+          Pagamento confirmado! Use o mesmo e-mail da sua compra para criar a senha e acessar sua agenda.
+        </p>
+        {error && <div className="badge badge-danger" style={{ marginBottom: 16, display: "flex" }}>{error}</div>}
+        <Field label="E-mail usado na compra">
+          <input type="email" placeholder="voce@email.com" value={email} onChange={e => { setEmail(e.target.value); setError(""); }} />
+        </Field>
+        <Field label="Crie sua senha">
+          <div style={{ position: "relative" }}>
+            <input type={showPw ? "text" : "password"} placeholder="Mínimo 6 caracteres" value={password} onChange={e => { setPassword(e.target.value); setError(""); }} style={{ paddingRight: 42 }} />
+            <button onClick={() => setShowPw(!showPw)} style={{ position: "absolute", right: 10, top: 9, background: "none", border: "none", color: "var(--text-2)" }} tabIndex={-1} aria-label={showPw ? "Ocultar senha" : "Mostrar senha"}>
+              <Icon name={showPw ? "eyeOff" : "eye"} size={17} />
+            </button>
+          </div>
+        </Field>
+        <Field label="Confirme a senha">
+          <input type={showPw ? "text" : "password"} placeholder="Repita a senha" value={confirmPassword} onChange={e => { setConfirmPassword(e.target.value); setError(""); }} onKeyDown={e => e.key === "Enter" && canSubmit && submit()} />
+        </Field>
+        <button className="btn btn-primary btn-block" onClick={submit} disabled={!canSubmit || loading} style={{ marginTop: 8, opacity: (canSubmit && !loading) ? 1 : 0.5 }}>
+          {loading ? "Ativando..." : "Criar senha e acessar"}
         </button>
       </div>
     </AuthShell>
@@ -2441,6 +2519,11 @@ function Root() {
         setBooted(true);
         return;
       }
+      if (hash.startsWith("#/ativar")) {
+        setView("activate");
+        setBooted(true);
+        return;
+      }
       const { data } = await supabaseClient.auth.getSession();
       const user = data?.session?.user || null;
       if (user) {
@@ -2483,7 +2566,14 @@ function Root() {
   if (!booted) return <LoadingScreen />;
 
   const goLanding = () => { setView("landing"); };
-  const goSignup = (plan) => { setSignupPlan(plan && typeof plan === "string" ? plan : "mensal"); setView("signup"); };
+  const KIWIFY_CHECKOUT_LINKS = {
+    mensal: "https://pay.kiwify.com.br/g4e96d9",
+    anual: "https://pay.kiwify.com.br/Gpdsk9L",
+  };
+  const goSignup = (plan) => {
+    const planKey = plan && typeof plan === "string" && KIWIFY_CHECKOUT_LINKS[plan] ? plan : "mensal";
+    window.location.href = KIWIFY_CHECKOUT_LINKS[planKey];
+  };
   const goLogin = () => setView("login");
   const goAdminLogin = () => setView("adminLogin");
 
@@ -2555,6 +2645,8 @@ function Root() {
   let content;
   if (view === "public") {
     content = <PublicBookingPage slug={publicSlug} onGoLanding={goLanding} />;
+  } else if (view === "activate") {
+    content = <ActivateAccountScreen onBack={goLanding} onActivated={() => { window.location.hash = ""; goLogin(); }} />;
   } else if (view === "signup") {
     content = <SignupScreen initialPlan={signupPlan} onBack={goLanding} onComplete={handleSignupComplete} />;
   } else if (view === "login") {
@@ -2587,4 +2679,105 @@ root.render(<Root />);
   padding:16px 20px; display:none; align-items:center; gap:14px; box-shadow:0 -8px 32px rgba(0,0,0,0.5);">
   <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#C77DFF,#E8C4A0);
     display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" s
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1A1420" stroke-width="2">
+      <path d="M12 3l1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5L12 3z"/>
+    </svg>
+  </div>
+  <div style="flex:1;min-width:0;">
+    <p style="font-family:Inter,sans-serif;font-weight:700;font-size:14px;color:#F5F0E8;margin:0 0 2px;">
+      Instalar Agenda Glow</p>
+    <p style="font-family:Inter,sans-serif;font-size:12px;color:#8B8594;margin:0;">
+      Adicione à tela inicial e acesse como app</p>
+  </div>
+  <button id="pwa-install-btn" style="background:linear-gradient(135deg,#C77DFF,#9D4EDD);color:#fff;
+    border:none;border-radius:10px;padding:10px 18px;font-family:Inter,sans-serif;font-weight:700;
+    font-size:13px;cursor:pointer;flex-shrink:0;">Instalar</button>
+  <button id="pwa-dismiss-btn" style="background:none;border:none;color:#8B8594;cursor:pointer;
+    padding:8px;flex-shrink:0;font-size:20px;line-height:1;">×</button>
+</div>
+
+<div id="ios-banner" style="display:none; position:fixed; bottom:0; left:0; right:0; z-index:9999;
+  background:linear-gradient(135deg,#1F1922,#211B26); border-top:1px solid rgba(245,240,232,0.16);
+  padding:18px 20px; box-shadow:0 -8px 32px rgba(0,0,0,0.5);">
+  <button id="ios-dismiss-btn" style="position:absolute;top:12px;right:14px;background:none;border:none;
+    color:#8B8594;cursor:pointer;font-size:20px;line-height:1;">×</button>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+    <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#C77DFF,#E8C4A0);
+      display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1A1420" stroke-width="2">
+        <path d="M12 3l1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5L12 3z"/>
+      </svg>
+    </div>
+    <div>
+      <p style="font-family:Inter,sans-serif;font-weight:700;font-size:14px;color:#F5F0E8;margin:0 0 2px;">
+        Instalar no iPhone</p>
+      <p style="font-family:Inter,sans-serif;font-size:12px;color:#8B8594;margin:0;">
+        Acesse como app, sem precisar da App Store</p>
+    </div>
+  </div>
+  <div style="background:rgba(245,240,232,0.06);border-radius:12px;padding:14px 16px;">
+    <p style="font-family:Inter,sans-serif;font-size:13px;color:#C9C2D1;margin:0 0 8px;">
+      <b style="color:#F5F0E8;">1.</b> Toque em
+      <span style="display:inline-flex;align-items:center;gap:3px;background:rgba(199,125,255,0.15);
+        border-radius:6px;padding:2px 8px;color:#C77DFF;font-weight:700;">
+        Compartilhar
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/>
+        </svg>
+      </span>
+      na barra do Safari
+    </p>
+    <p style="font-family:Inter,sans-serif;font-size:13px;color:#C9C2D1;margin:0;">
+      <b style="color:#F5F0E8;">2.</b> Escolha <b style="color:#F5F0E8;">"Adicionar à Tela de Início"</b>
+      e depois <b style="color:#F5F0E8;">"Adicionar"</b>
+    </p>
+  </div>
+</div>
+
+<script>
+(function() {
+  let deferredPrompt = null;
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isInStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  const dismissed = sessionStorage.getItem('pwa-dismissed');
+
+  if (isInStandalone || dismissed) return;
+
+  if (isIOS) {
+    setTimeout(() => {
+      const b = document.getElementById('ios-banner');
+      if (b) b.style.display = 'block';
+    }, 4000);
+    document.getElementById('ios-dismiss-btn')?.addEventListener('click', () => {
+      document.getElementById('ios-banner').style.display = 'none';
+      sessionStorage.setItem('pwa-dismissed', '1');
+    });
+  } else {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      setTimeout(() => {
+        const b = document.getElementById('pwa-banner');
+        if (b) b.style.display = 'flex';
+      }, 4000);
+    });
+
+    document.getElementById('pwa-install-btn')?.addEventListener('click', () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(() => {
+        deferredPrompt = null;
+        document.getElementById('pwa-banner').style.display = 'none';
+      });
+    });
+
+    document.getElementById('pwa-dismiss-btn')?.addEventListener('click', () => {
+      document.getElementById('pwa-banner').style.display = 'none';
+      sessionStorage.setItem('pwa-dismissed', '1');
+    });
+  }
+})();
+</script>
+
+</body>
+</html>
