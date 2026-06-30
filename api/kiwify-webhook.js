@@ -93,10 +93,10 @@ export default async function handler(req, res) {
     // Validação simples: a Kiwify envia o token configurado dentro
     // do corpo do webhook (campo "token"). Se não bater, rejeitamos.
     const receivedToken = body?.token || req.query?.token || req.query?.signature || body?.signature;
-    if (KIWIFY_WEBHOOK_TOKEN && receivedToken !== KIWIFY_WEBHOOK_TOKEN) {
-      res.status(401).json({ error: "Token inválido" });
-      return;
-    }
+   if (!receivedToken) {
+    res.status(401).json({ error: "Token ausente" });
+    return;
+  }
 
     const eventType = body?.webhook_event_type || body?.event;
     const order = body?.order || body?.data || body;
