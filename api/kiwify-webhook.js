@@ -240,6 +240,24 @@ export default async function handler(req, res) {
           });
         }
 
+        // A coluna "method" só aceita: pix, cartao, boleto, gratuito.
+        // Mapeamos o método de pagamento real que a Kiwify manda.
+        const rawPaymentMethod = (
+          order?.payment_method ||
+          order?.Payment?.method ||
+          order?.payment_type ||
+          ""
+        ).toLowerCase();
+        const METHOD_MAP = {
+          credit_card: "cartao",
+          card: "cartao",
+          pix: "pix",
+          billet: "boleto",
+          boleto: "boleto",
+          free_price: "gratuito",
+        };
+        const paymentMethod = METHOD_MAP[rawPaymentMethod] || "cartao";
+
         await supabaseRequest(`payments`, {
           method: "POST",
           body: JSON.stringify({
@@ -251,7 +269,7 @@ export default async function handler(req, res) {
             // ⚠️ Se sua coluna guarda em CENTAVOS, remova o "/ 100" abaixo.
             amount: (order?.Commissions?.product_base_price ?? 0) / 100,
             date: today,
-            method: "kiwify",
+            method: paymentMethod,
             status: "pago",
             // A tabela "payments" foi criada pensando na InfinitePay, então
             // não tem colunas "source"/"external_id". Reaproveitamos o
