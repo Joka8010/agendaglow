@@ -98,13 +98,45 @@ export default async function handler(req, res) {
     return;
   }
 
-    const eventType = body?.webhook_event_type || body?.event;
-    const order = body?.order || body?.data || body;
+   const order = body?.order || body?.data || body;
+
+    // A Kiwify manda o nome do evento (em inglês) dentro de "order",
+    // não na raiz do JSON — e usa nomes diferentes dos gatilhos do painel.
+    const rawEventType = order?.webhook_event_type || body?.webhook_event_type || body?.event || "";
+    const orderStatus = (order?.order_status || "").toLowerCase();
+
+    const EVENT_MAP = {
+      order_approved: "compra_aprovada",
+      order_paid: "compra_aprovada",
+      subscription_renewed: "subscription_renewed",
+      order_refused: "compra_recusada",
+      subscription_late: "subscription_late",
+      order_refunded: "compra_reembolsada",
+      refunded: "compra_reembolsada",
+      chargeback: "chargeback",
+      subscription_canceled: "subscription_canceled",
+      subscription_cancelled: "subscription_canceled",
+      billet_created: "boleto_gerado",
+      pix_created: "pix_gerado",
+      cart_abandoned: "carrinho_abandonado",
+    };
+
+    let eventType = EVENT_MAP[rawEventType] || rawEventType;
+
+    // Rede de segurança: se algum evento novo/desconhecido chegar mas o
+    // status já for "paid", tratamos como compra aprovada mesmo assim.
+    if (eventType !== "compra_aprovada" && orderStatus === "paid") {
+      eventType = "compra_aprovada";
+    }
+
     const customerEmail = (order?.Customer?.email || order?.customer?.email || "").toLowerCase().trim();
     const customerName = order?.Customer?.full_name || order?.customer?.full_name || order?.Customer?.first_name || "";
     const subscriptionId = order?.subscription_id || order?.Subscription?.id || order?.id || "";
-    const planName = (order?.product?.name || order?.Product?.name || "").toLowerCase();
-    const isAnnual = planName.includes("anual") || planName.includes("annual") || planName.includes("ano");
+
+    // O plano vem em order.Subscription.plan, não em order.product/order.Product
+    const planName = (order?.Subscription?.plan?.name || order?.Product?.product_name || "").toLowerCase();
+    const planFrequency = (order?.Subscription?.plan?.frequency || "").toLowerCase();
+    const isAnnual = planFrequency === "yearly" || planFrequency === "annual" || planName.includes("anual") || planName.includes("ano");
 
     if (!customerEmail) {
       res.status(200).json({ ok: true, ignored: "sem e-mail no payload" });
