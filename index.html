@@ -1795,6 +1795,24 @@ function StudioApp({ studio, setStudio, onLogout }) {
 
   if (loadingData) return <LoadingScreen />;
 
+ const bs = billingStatus(fullStudio);
+    if (bs === "cancelado" || bs === "bloqueado") {
+      return (
+        <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div className="card" style={{ maxWidth: 420, textAlign: "center", padding: 32 }}>
+            <p style={{ fontWeight: 600, fontSize: 20, marginBottom: 12 }}>
+              {bs === "cancelado" ? "Assinatura cancelada" : "Assinatura bloqueada"}
+            </p>
+            <p style={{ color: "var(--text-2)", marginBottom: 24 }}>
+              {bs === "cancelado"
+                ? "Sua assinatura do Agenda Glow foi cancelada. Para continuar usando o sistema, faça uma nova assinatura."
+                : "Identificamos um problema com o pagamento da sua assinatura. Regularize para voltar a acessar o sistema."}
+            </p>
+            <button className="btn btn-ghost" style={{ width: "100%" }} onClick={onLogout}>Sair</button>
+          </div>
+        </div>
+      );
+    }
   const tabs = {
     agenda: <AgendaTab studio={fullStudio} updateStudio={updateStudio} onMenu={() => setMobileOpen(true)} />,
     clientes: <ClientsTab studio={fullStudio} updateStudio={updateStudio} onMenu={() => setMobileOpen(true)} />,
