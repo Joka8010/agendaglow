@@ -126,13 +126,20 @@ export default async function handler(req, res) {
   try {
     const body = req.body;
 
-    // Validação simples: a Kiwify envia o token configurado dentro
-    // do corpo do webhook (campo "token"). Se não bater, rejeitamos.
+    // Validação de segurança: a Kiwify manda o token configurado no
+    // painel (query string ?token=... ou dentro do corpo). Comparamos
+    // com o valor salvo em KIWIFY_WEBHOOK_TOKEN — se não bater, ou se a
+    // variável de ambiente não estiver configurada, rejeitamos.
     const receivedToken = body?.token || req.query?.token || req.query?.signature || body?.signature;
-   if (!receivedToken) {
-    res.status(401).json({ error: "Token ausente" });
-    return;
-  }
+    if (!KIWIFY_WEBHOOK_TOKEN) {
+      console.error("KIWIFY_WEBHOOK_TOKEN não está configurado nas variáveis de ambiente.");
+      res.status(500).json({ error: "Configuração ausente no servidor" });
+      return;
+    }
+    if (!receivedToken || receivedToken !== KIWIFY_WEBHOOK_TOKEN) {
+      res.status(401).json({ error: "Token inválido" });
+      return;
+    }
 
    const order = body?.order || body?.data || body;
 
