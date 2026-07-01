@@ -216,7 +216,7 @@ export default async function handler(req, res) {
           body: JSON.stringify({
             studio_id: studio.id,
             label: `Assinatura Agenda Glow — Plano ${isAnnual ? "Anual" : "Mensal"} (Kiwify)`,
-            amount: order?.product?.price ?? order?.Product?.price ?? 0,
+            amount: (order?.Commissions?.product_base_price ?? 0) / 100,
             method: "kiwify",
             status: "pago",
             source: "kiwify",
