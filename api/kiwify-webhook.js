@@ -250,10 +250,14 @@ export default async function handler(req, res) {
             // coluna "amount" guarda em REAIS (ex: 19.90).
             // ⚠️ Se sua coluna guarda em CENTAVOS, remova o "/ 100" abaixo.
             amount: (order?.Commissions?.product_base_price ?? 0) / 100,
+            date: today,
             method: "kiwify",
             status: "pago",
-            source: "kiwify",
-            external_id: subscriptionId,
+            // A tabela "payments" foi criada pensando na InfinitePay, então
+            // não tem colunas "source"/"external_id". Reaproveitamos o
+            // campo infinitepay_order_nsu só para guardar o ID da
+            // assinatura da Kiwify e manter rastreabilidade.
+            infinitepay_order_nsu: subscriptionId,
           }),
         });
         break;
