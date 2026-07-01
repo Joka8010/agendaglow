@@ -81,6 +81,42 @@ function randomPassword() {
   return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2) + "Aa1!";
 }
 
+// Cria o usuário no Supabase Auth. Se o e-mail já existir (erro 422),
+// busca o usuário já existente em vez de falhar — isso resolve o caso
+// de reenvios de webhook ou tentativas anteriores que já criaram o login,
+// mas sem o estúdio ter sido criado junto.
+async function getOrCreateAuthUser(email, name) {
+  try {
+    return await supabaseAuthAdminRequest("users", {
+      method: "POST",
+      body: JSON.stringify({
+        email,
+        password: randomPassword(),
+        email_confirm: true,
+        user_metadata: { full_name: name },
+      }),
+    });
+  } catch (err) {
+    const alreadyExists = /already been registered|422|already exists/i.test(err.message);
+    if (!alreadyExists) throw err;
+
+    // Usuário já existe: procura ele na lista de usuários do Auth.
+    let page = 1;
+    const perPage = 200;
+    while (page <= 25) { // limite de segurança: até 5000 usuários
+      const list = await supabaseAuthAdminRequest(`users?page=${page}&per_page=${perPage}`, {
+        method: "GET",
+      });
+      const users = list?.users || [];
+      const found = users.find(u => (u.email || "").toLowerCase() === email.toLowerCase());
+      if (found) return found;
+      if (users.length < perPage) break; // acabou a lista
+      page++;
+    }
+    throw new Error(`Usuário com e-mail ${email} não encontrado no Auth mesmo após erro de duplicidade.`);
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Method not allowed" });
@@ -158,16 +194,9 @@ export default async function handler(req, res) {
         const nextBilling = addDays(today, isAnnual ? 365 : 30);
 
         if (!studio) {
-          // PRIMEIRA COMPRA: cria o login e o estúdio automaticamente.
-          const newUser = await supabaseAuthAdminRequest("users", {
-            method: "POST",
-            body: JSON.stringify({
-              email: customerEmail,
-              password: randomPassword(),
-              email_confirm: true,
-              user_metadata: { full_name: customerName },
-            }),
-          });
+          // PRIMEIRA COMPRA: cria o login (ou reaproveita se já existir)
+          // e o estúdio automaticamente.
+          const newUser = await getOrCreateAuthUser(customerEmail, customerName);
 
           const slugBase = slugify(customerName || customerEmail.split("@")[0]);
           let slug = slugBase, n = 1, exists = true;
@@ -216,6 +245,10 @@ export default async function handler(req, res) {
           body: JSON.stringify({
             studio_id: studio.id,
             label: `Assinatura Agenda Glow — Plano ${isAnnual ? "Anual" : "Mensal"} (Kiwify)`,
+            // O valor real da venda vem em Commissions.product_base_price,
+            // em CENTAVOS. Dividimos por 100 aqui pq assumimos que sua
+            // coluna "amount" guarda em REAIS (ex: 19.90).
+            // ⚠️ Se sua coluna guarda em CENTAVOS, remova o "/ 100" abaixo.
             amount: (order?.Commissions?.product_base_price ?? 0) / 100,
             method: "kiwify",
             status: "pago",
