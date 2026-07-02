@@ -1477,7 +1477,7 @@ const pendingAppts = studio.appointments.filter(a => a.status === "pendente").so
                       <p style={{ fontWeight: 600, fontSize: 14 }}>{client?.name || "Cliente"}</p>
                       <p style={{ fontSize: 12.5, color: "var(--text-2)" }}>{service?.name} · {fmtDate(a.date)} às {a.time}</p>
                     </div>
-                    <button className="btn btn-primary btn-sm" onClick={() => approveAppt(a.id)}>Aceitar</button>
+                    <button className="btn btn-primary btn-sm" onClick={() => { approveAppt(a.id); if (client?.phone) window.open(buildWhatsappLink(client.phone, `Oi, ${(client?.name || "").split(" ")[0]}! Seu horário de ${service?.name} foi confirmado para o dia ${fmtDate(a.date)} às ${a.time}. Te esperamos!`), "_blank"); }}>Aceitar</button>
                     <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => rejectAppt(a.id)}>Recusar</button>
                   </div>
                 );
