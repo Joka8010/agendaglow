@@ -1417,7 +1417,7 @@ function AgendaTab({ studio, updateStudio, onMenu }) {
   const [editing, setEditing] = useState(null);
 
   const dayAppts = studio.appointments.filter(a => a.date === selectedDate).sort((a, b) => a.time.localeCompare(b.time));
-
+const pendingAppts = studio.appointments.filter(a => a.status === "pendente").sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
   const getClient = (id) => studio.clients.find(c => c.id === id);
   const getService = (id) => studio.services.find(s => s.id === id);
 
@@ -1436,11 +1436,23 @@ function AgendaTab({ studio, updateStudio, onMenu }) {
     setEditing(null);
   };
 
-  const removeAppt = async (id) => {
-    await DB.deleteAppointment(id);
-    updateStudio({ ...studio, appointments: studio.appointments.filter(a => a.id !== id) });
-    toast("Agendamento removido", "info");
-  };
+ const removeAppt = async (id) => {
+      await DB.deleteAppointment(id);
+      updateStudio({ ...studio, appointments: studio.appointments.filter(a => a.id !== id) });
+      toast("Agendamento removido", "info");
+    };
+
+    const approveAppt = async (id) => {
+      await DB.updateAppointment(id, { status: "confirmado" });
+      updateStudio({ ...studio, appointments: studio.appointments.map(a => a.id === id ? { ...a, status: "confirmado" } : a) });
+      toast("Agendamento confirmado");
+    };
+
+    const rejectAppt = async (id) => {
+      await DB.updateAppointment(id, { status: "cancelado" });
+      updateStudio({ ...studio, appointments: studio.appointments.map(a => a.id === id ? { ...a, status: "cancelado" } : a) });
+      toast("Agendamento recusado", "info");
+    };
 
   return (
     <div>
@@ -1450,7 +1462,29 @@ function AgendaTab({ studio, updateStudio, onMenu }) {
         </button>
       } />
 
-      <MonthCalendar appointments={studio.appointments} selectedDate={selectedDate} onSelect={setSelectedDate} />
+     {pendingAppts.length > 0 && (
+          <div className="card" style={{ marginBottom: 20, border: "1px solid rgba(240,180,41,0.35)", background: "rgba(240,180,41,0.06)" }}>
+            <p style={{ fontWeight: 600, fontSize: 14.5, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name="clock" size={16} style={{ color: "#f0b429" }} />
+              {pendingAppts.length} agendamento{pendingAppts.length > 1 ? "s" : ""} aguardando aprovação
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {pendingAppts.map(a => {
+                const client = getClient(a.clientId), service = getService(a.serviceId);
+                return (
+                  <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: 10, background: "var(--bg-1)", borderRadius: 8 }}>
+                    <div style={{ flex: 1, minWidth: 160 }}>
+                      <p style={{ fontWeight: 600, fontSize: 14 }}>{client?.name || "Cliente"}</p>
+                      <p style={{ fontSize: 12.5, color: "var(--text-2)" }}>{service?.name} · {fmtDate(a.date)} às {a.time}</p>
+                    </div>
+                    <button className="btn btn-primary btn-sm" onClick={() => approveAppt(a.id)}>Aceitar</button>
+                    <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => rejectAppt(a.id)}>Recusar</button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}  <MonthCalendar appointments={studio.appointments} selectedDate={selectedDate} onSelect={setSelectedDate} />
 
       <div style={{marginBottom:14}}>
         <p style={{fontSize:13.5,color:"var(--text-2)"}}>
@@ -2400,7 +2434,7 @@ function PublicBookingPage({ slug, onGoLanding }) {
     setSubmitting(true);
     try {
       const client = await DB.createClient(studio.id, { name, phone });
-      await DB.createAppointment(studio.id, { clientId: client.id, serviceId, date, time, status: "confirmado" });
+      await DB.createAppointment(studio.id, { clientId: client.id, serviceId, date, time, status: "pendente" });
       setDone(true);
     } catch (e) {
       setSubmitting(false);
@@ -2414,11 +2448,11 @@ function PublicBookingPage({ slug, onGoLanding }) {
           <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(127,217,168,0.14)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px", color: "var(--success)" }}>
             <Icon name="check" size={26} />
           </div>
-          <h2 className="serif" style={{ fontSize: 22, marginBottom: 10 }}>Agendamento confirmado!</h2>
+          <h2 className="serif" style={{ fontSize: 22, marginBottom: 10 }}>Agendamento recebido!</h2>
           <p style={{ color: "var(--text-1)", marginBottom: 18, fontSize: 14.5 }}>
-            {service?.name} no dia {fmtDate(date)} às {time}. Guarde essa data — o studio tem seu contato e pode falar com você por lá se precisar.
+           {service?.name} no dia {fmtDate(date)} às {time}. Recebemos seu pedido — o studio vai confirmar em breve. Guarde essa data, e fique de olho no WhatsApp.
           </p>
-          <div className="badge badge-success"><Icon name="check" size={13} /> Horário reservado</div>
+         <div className="badge badge-warning"><Icon name="clock" size={13} /> Aguardando confirmação</div>
         </div>
       </div>
     );
@@ -2798,4 +2832,4 @@ root.render(<Root />);
 </script>
 
 </body>
-</html>
+</html> 
