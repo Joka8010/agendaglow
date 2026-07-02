@@ -1751,35 +1751,12 @@ function PaymentsTab({ studio, onMenu }) {
             </div>
           </div>
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-            <StatCard icon="money" label="Total recebido (todos)" value={fmtBRL(totalReceived)} tone="success" />
-            <StatCard icon="chart" label="Recebido este mês" value={fmtBRL(thisMonth)} tone="gold" />
+            
             <StatCard icon="scissors" label={`Agendamentos no período (${periodAppointments.length})`} value={fmtBRL(periodAppTotal)} tone="lilac" />
             <StatCard icon="calendar" label="Próxima cobrança" value={fmtDate(studio.nextBilling)} tone="lilac" />
           </div>
         </div>
-      {studio.payments.length === 0 ? (
-        <EmptyState icon="money" title="Nenhum pagamento registrado" body="Seu histórico de pagamentos da assinatura aparecerá aqui." />
-      ) : (
-        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-          <div className="table-wrap">
-          <table>
-            <thead><tr><th>Descrição</th><th>Data</th><th>Forma</th><th>Status</th><th style={{ textAlign: "right" }}>Valor</th></tr></thead>
-            <tbody>
-              {studio.payments.slice().sort((a, b) => b.date.localeCompare(a.date)).map(p => (
-                <tr key={p.id}>
-                  <td>{p.label}</td>
-                  <td style={{ color: "var(--text-2)" }}>{fmtDate(p.date)}</td>
-                  <td><span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--text-1)" }}><Icon name={PAYMENT_METHODS.find(m => m.id === p.method)?.icon || "money"} size={14} />{PAYMENT_METHODS.find(m => m.id === p.method)?.label || p.method}</span></td>
-                  <td><StatusBadge status={p.status} /></td>
-                  <td style={{ textAlign: "right", fontWeight: 600 }}>{fmtBRL(p.amount)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-        </div>
-      )}
-    </div>
+     
   );
 }
 
