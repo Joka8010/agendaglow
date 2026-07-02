@@ -2428,7 +2428,7 @@ function PublicBookingPage({ slug, onGoLanding }) {
     const service = services.find(s => s.id === serviceId);
     const selectedDuration = service?.duration || 30;
     const dayAppointments = appointments.filter(a => a.date === date && a.status !== "cancelado");
-    const allSlots = []; for (let h = 8; h <= 19; h++) { allSlots.push(`${String(h).padStart(2,'0')}:00`); if (h < 17) allSlots.push(`${String(h).padStart(2,'0')}:30`); } const slots = allSlots.filter(t => { const m = timeToMin(t); return m + selectedDuration <= timeToMin("18:00"); });
+    const allSlots = []; for (let h = 8; h <= 19; h++) { allSlots.push(`${String(h).padStart(2,'0')}:00`); if (h < 17) allSlots.push(`${String(h).padStart(2,'0')}:30`); } const slots = allSlots.filter(t => { const m = timeToMin(t); return m + selectedDuration <= timeToMin("20:00"); });
     const isSlotTaken = (t) => {
       const startNew = timeToMin(t);
       const endNew = startNew + selectedDuration;
