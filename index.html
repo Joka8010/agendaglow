@@ -1882,7 +1882,7 @@ function platformStats(studios) {
 }
 
 function billingStatus(s) {
-  if (s.planStatus === "cancelado_plano") return "cancelado";
+  if (s.planStatus === "cancelado") return "cancelado";
   if (!s.nextBilling) return "ativo";
   const diff = Math.floor((new Date(s.nextBilling) - new Date(todayISO())) / 86400000);
   if (diff < -7) return "bloqueado";
@@ -2045,7 +2045,7 @@ function StudioDetailModal({ studio, onClose, onChangeStatus, onDelete, onRenewF
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap:"wrap" }}>
         {studio.planStatus === "ativo" ? (
-          <button className="btn btn-ghost" style={{ color: "var(--danger)", flex:1 }} onClick={() => onChangeStatus(studio.id, "cancelado_plano")}>Cancelar assinatura</button>
+          <button className="btn btn-ghost" style={{ color: "var(--danger)", flex:1 }} onClick={() => onChangeStatus(studio.id, "cancelado")}>Cancelar assinatura</button>
         ) : (
           <button className="btn btn-primary" style={{ flex:1 }} onClick={() => onChangeStatus(studio.id, "ativo")}>Reativar assinatura</button>
         )}
