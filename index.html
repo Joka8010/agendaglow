@@ -512,12 +512,12 @@ const DB = {
   async listAppointments(studioId) {
     const { data, error } = await supabaseClient.from("appointments").select("*").eq("studio_id", studioId).order("date").order("time");
     if (error || !data) return [];
-    return data.map(r => ({ id: r.id, clientId: r.client_id, serviceId: r.service_id, date: r.date, time: r.time, status: r.status }));
+    return data.map(r => ({ id: r.id, clientId: r.client_id, serviceId: r.service_id, date: r.date, time: r.time, status: r.status, groupId: r.group_id }));
   },
-  async createAppointment(studioId, { clientId, serviceId, date, time, status }) {
-    const { data, error } = await supabaseClient.from("appointments").insert({ studio_id: studioId, client_id: clientId, service_id: serviceId, date, time, status: status || "confirmado" }).select().single();
+  async createAppointment(studioId, { clientId, serviceId, date, time, status, groupId }) {
+    const { data, error } = await supabaseClient.from("appointments").insert({ studio_id: studioId, client_id: clientId, service_id: serviceId, date, time, status: status || "confirmado", group_id: groupId || null }).select().single();
     if (error) throw error;
-    return { id: data.id, clientId: data.client_id, serviceId: data.service_id, date: data.date, time: data.time, status: data.status };
+    return { id: data.id, clientId: data.client_id, serviceId: data.service_id, date: data.date, time: data.time, status: data.status, groupId: data.group_id };
   },
   async updateAppointment(apptId, patch) {
     const payload = {};
@@ -1359,15 +1359,15 @@ function MonthCalendar({ appointments, selectedDate, onSelect }) {
 
 function AppointmentModal({ studio, onClose, onSave, editing }) {
   const [clientId, setClientId] = useState(editing?.clientId || studio.clients[0]?.id || "");
-  const [serviceId, setServiceId] = useState(editing?.serviceId || studio.services[0]?.id || "");
+  const [serviceIds, setServiceIds] = useState(editing ? [editing.serviceId] : (studio.services[0] ? [studio.services[0].id] : [])); const toggleService = (id) => setServiceIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const [date, setDate] = useState(editing?.date || todayISO());
   const [time, setTime] = useState(editing?.time || "09:00");
   const [status, setStatus] = useState(editing?.status || "confirmado");
 
-  const canSave = clientId && serviceId && date && time;
+  const canSave = clientId && serviceIds.length > 0 && date && time;
   const client = studio.clients.find(c => c.id === clientId);
-  const service = studio.services.find(s => s.id === serviceId);
-  const waMessage = client && service ? `Oi, ${client.name.split(" ")[0]}! Confirmando seu horário de ${service.name} no dia ${fmtDate(date)} às ${time}. Te esperamos! ✨` : "";
+  const selectedServices = studio.services.filter(s => serviceIds.includes(s.id)); const totalPrice = selectedServices.reduce((sum, s) => sum + (s.price || 0), 0); const totalDuration = selectedServices.reduce((sum, s) => sum + (s.duration || 30), 0);
+  const waMessage = client && selectedServices.length > 0 ? `Oi, ${client.name.split(" ")[0]}! Confirmando seu horário de ${selectedServices.map(s => s.name).join(" + ")} no dia ${fmtDate(date)} às ${time}. Te esperamos! ✨` : "";
 
   return (
     <Modal onClose={onClose}>
@@ -1377,11 +1377,22 @@ function AppointmentModal({ studio, onClose, onSave, editing }) {
           {studio.clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </Field>
-      <Field label="Serviço">
-        <select value={serviceId} onChange={e => setServiceId(e.target.value)}>
-          {studio.services.map(s => <option key={s.id} value={s.id}>{s.name} — {fmtBRL(s.price)}</option>)}
-        </select>
-      </Field>
+      <Field label="Serviço (pode marcar mais de um)">
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 220, overflowY: "auto", border: "1px solid var(--line-strong)", borderRadius: 10, padding: 10 }}>
+                    {studio.services.map(s => (
+                      <label key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "6px 4px" }}>
+                        <input type="checkbox" checked={serviceIds.includes(s.id)} onChange={() => toggleService(s.id)} style={{ width: 18, height: 18 }} />
+                        <span style={{ flex: 1, fontSize: 14 }}>{s.name}</span>
+                        <span style={{ fontSize: 13, color: "var(--text-2)" }}>{fmtBRL(s.price)} · {s.duration || 30}min</span>
+                      </label>
+                    ))}
+                  </div>
+                  {selectedServices.length > 0 && (
+                    <p style={{ fontSize: 12.5, color: "var(--text-2)", marginTop: 8 }}>
+                      Total: {fmtBRL(totalPrice)} · {totalDuration}min
+                    </p>
+                  )}
+                </Field>
       <div style={{ display: "flex", gap: 12 }}>
         <Field label="Data"><input type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>
         <Field label="Horário"><input type="time" value={time} onChange={e => setTime(e.target.value)} /></Field>
@@ -1404,7 +1415,7 @@ function AppointmentModal({ studio, onClose, onSave, editing }) {
           </div>
         </a>
       )}
-      <button className="btn btn-primary btn-block" disabled={!canSave} style={{ opacity: canSave ? 1 : 0.5 }} onClick={() => onSave({ clientId, serviceId, date, time, status })}>
+      <button className="btn btn-primary btn-block" disabled={!canSave} style={{ opacity: canSave ? 1 : 0.5 }} onClick={() => onSave({ clientId, serviceIds, date, time, status })}>
         {editing ? "Salvar alterações" : "Criar agendamento"}
       </button>
     </Modal>
@@ -1423,19 +1434,39 @@ const pendingAppts = studio.appointments.filter(a => a.status === "pendente").so
   const getService = (id) => studio.services.find(s => s.id === id);
 
   const saveAppt = async (data) => {
-    if (editing) {
-      await DB.updateAppointment(editing.id, data);
-      const appts = studio.appointments.map(a => a.id === editing.id ? { ...a, ...data } : a);
-      updateStudio({ ...studio, appointments: appts });
-      toast("Agendamento atualizado");
-    } else {
-      const created = await DB.createAppointment(studio.id, data);
-      updateStudio({ ...studio, appointments: [...studio.appointments, created] });
-      toast("Agendamento criado");
-    }
-    setModalOpen(false);
-    setEditing(null);
-  };
+      const { serviceIds, ...rest } = data;
+      const ids = serviceIds && serviceIds.length > 0 ? serviceIds : [data.serviceId];
+
+      if (editing) {
+        // Atualiza o serviço principal do registro existente
+        await DB.updateAppointment(editing.id, { ...rest, serviceId: ids[0] });
+        let appts = studio.appointments.map(a => a.id === editing.id ? { ...a, ...rest, serviceId: ids[0] } : a);
+
+        // Se marcou serviços extras na edição, cria linhas novas no mesmo grupo
+        const groupId = editing.groupId || editing.id;
+        if (!editing.groupId) {
+          await DB.updateAppointment(editing.id, { groupId });
+          appts = appts.map(a => a.id === editing.id ? { ...a, groupId } : a);
+        }
+        for (let i = 1; i < ids.length; i++) {
+          const created = await DB.createAppointment(studio.id, { ...rest, serviceId: ids[i], groupId });
+          appts = [...appts, created];
+        }
+        updateStudio({ ...studio, appointments: appts });
+        toast("Agendamento atualizado");
+      } else {
+        const groupId = ids.length > 1 ? uid("grp") : null;
+        let appts = [...studio.appointments];
+        for (const sid of ids) {
+          const created = await DB.createAppointment(studio.id, { ...rest, serviceId: sid, groupId });
+          appts = [...appts, created];
+        }
+        updateStudio({ ...studio, appointments: appts });
+        toast("Agendamento criado");
+      }
+      setModalOpen(false);
+      setEditing(null);
+    };
 
  const removeAppt = async (id) => {
       await DB.deleteAppointment(id);
