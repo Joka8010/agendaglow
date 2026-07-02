@@ -1691,17 +1691,35 @@ function ServicesTab({ studio, updateStudio, onMenu }) {
 
 /* ---------- Payments history tab ---------- */
 function PaymentsTab({ studio, onMenu }) {
-  const totalReceived = studio.payments.filter(p => p.status === "pago").reduce((s, p) => s + p.amount, 0);
-  const thisMonth = studio.payments.filter(p => p.status === "pago" && p.date.slice(0, 7) === todayISO().slice(0, 7)).reduce((s, p) => s + p.amount, 0);
-
+    const todayStr = todayISO();
+    const firstDay = todayStr.slice(0, 7) + "-01";
+    const [startDate, setStartDate] = React.useState(firstDay);
+    const [endDate, setEndDate] = React.useState(todayStr);
+    const totalReceived = studio.payments.filter(p => p.status === "pago").reduce((s, p) => s + p.amount, 0);
+    const thisMonth = studio.payments.filter(p => p.status === "pago" && p.date.slice(0, 7) === todayStr.slice(0, 7)).reduce((s, p) => s + p.amount, 0);
+    const periodAppointments = studio.appointments.filter(a => a.status !== "cancelado" && a.date >= startDate && a.date <= endDate);
+    const periodAppTotal = periodAppointments.reduce((s, a) => { const svc = studio.services.find(sv => sv.id === a.serviceId); return s + (svc?.price || 0); }, 0);
   return (
     <div>
-      <TopBar title="Histórico de pagamentos" onMenu={onMenu} />
-      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
-        <StatCard icon="money" label="Total recebido" value={fmtBRL(totalReceived)} tone="success" />
-        <StatCard icon="chart" label="Recebido este mês" value={fmtBRL(thisMonth)} tone="gold" />
-        <StatCard icon="calendar" label="Próxima cobrança da assinatura" value={fmtDate(studio.nextBilling)} tone="lilac" />
-      </div>
+      <TopBar title="Faturamento" onMenu={onMenu} />
+      <div style={{ marginBottom: 20 }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
+            <div>
+              <label style={{ fontSize: 12, color: "var(--text-2)", display: "block", marginBottom: 4 }}>De</label>
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ background: "var(--bg-2)", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 12px", color: "var(--text-1)", fontSize: 14 }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: "var(--text-2)", display: "block", marginBottom: 4 }}>Até</label>
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ background: "var(--bg-2)", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 12px", color: "var(--text-1)", fontSize: 14 }} />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+            <StatCard icon="money" label="Total recebido (todos)" value={fmtBRL(totalReceived)} tone="success" />
+            <StatCard icon="chart" label="Recebido este mês" value={fmtBRL(thisMonth)} tone="gold" />
+            <StatCard icon="scissors" label={`Agendamentos no período (${periodAppointments.length})`} value={fmtBRL(periodAppTotal)} tone="lilac" />
+            <StatCard icon="calendar" label="Próxima cobrança" value={fmtDate(studio.nextBilling)} tone="lilac" />
+          </div>
+        </div>
       {studio.payments.length === 0 ? (
         <EmptyState icon="money" title="Nenhum pagamento registrado" body="Seu histórico de pagamentos da assinatura aparecerá aqui." />
       ) : (
