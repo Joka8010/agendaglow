@@ -536,14 +536,14 @@ const DB = {
 
   // --- PAYMENTS (histórico da assinatura do estúdio) ---
   async listPayments(studioId) {
-    const { data, error } = await supabaseClient.from("payments").select("*").eq("studio_id", studioId).order("paid_at", { ascending: false });
-    if (error || !data) return [];
-    return data.map(r => ({ id: r.id, label: r.label, amount: Number(r.amount), date: (r.paid_at || "").slice(0, 10), method: r.method, status: r.status }));
-  },
-  async createPayment(studioId, { label, amount, method, status, source }) {
-    const { error } = await supabaseClient.from("payments").insert({ studio_id: studioId, label, amount, method, status: status || "pago", source: source || "manual" });
-    if (error) throw error;
-  },
+        const { data, error } = await supabaseClient.from("payments").select("*").eq("studio_id", studioId).order("date", { ascending: false });
+        if (error || !data) return [];
+        return data.map(r => ({ id: r.id, label: r.label, amount: Number(r.amount), date: r.date || (r.created_at || "").slice(0, 10), method: r.method, status: r.status }));
+      },
+      async createPayment(studioId, { label, amount, method, status }) {
+        const { error } = await supabaseClient.from("payments").insert({ studio_id: studioId, label, amount, method, status: status || "pago", date: todayISO() });
+        if (error) throw error;
+      },
 
   // --- PLATFORM ADMINS (login do painel administrativo) ---
   async isPlatformAdmin(userId) {
