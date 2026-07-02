@@ -2424,10 +2424,22 @@ function PublicBookingPage({ slug, onGoLanding }) {
   }
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(todayISO(), i));
-  const takenTimes = appointments.filter(a => a.date === date).map(a => a.time);
-  const slots = ["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00"];
-  const service = services.find(s => s.id === serviceId);
-
+  const timeToMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+    const service = services.find(s => s.id === serviceId);
+    const selectedDuration = service?.duration || 30;
+    const dayAppointments = appointments.filter(a => a.date === date && a.status !== "cancelado");
+    const slots = ["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00"];
+    const isSlotTaken = (t) => {
+      const startNew = timeToMin(t);
+      const endNew = startNew + selectedDuration;
+      return dayAppointments.some(a => {
+        const aService = services.find(s => s.id === a.serviceId);
+        const dur = aService?.duration || 30;
+        const startExisting = timeToMin(a.time);
+        const endExisting = startExisting + dur;
+        return startNew < endExisting && endNew > startExisting;
+      });
+    }; 
   const canBook = serviceId && date && time && name.trim().length >= 2 && phone.trim().length >= 8;
 
   const confirm = async () => {
