@@ -303,6 +303,8 @@ export default async function handler(req, res) {
         if (studio) {
           await supabaseRequest(`studios?id=eq.${studio.id}`, {
             method: "PATCH",
+            // A coluna plan_status só aceita: ativo, pendente, atrasado, cancelado
+            // (confirmado via studios_plan_status_check no banco).
             body: JSON.stringify({ plan_status: "cancelado" }),
           });
         }
