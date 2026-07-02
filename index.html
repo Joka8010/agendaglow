@@ -1241,6 +1241,7 @@ function StudioSidebar({ active, setActive, studio, onLogout, mobileOpen, setMob
     { id: "agenda", label: "Agenda", icon: "calendar" },
     { id: "clientes", label: "Clientes", icon: "users" },
     { id: "servicos", label: "Serviços", icon: "scissors" },
+    { id: "faturamento", label: "Faturamento", icon: "chart" },
     { id: "pagamentos", label: "Histórico de pagamentos", icon: "money" },
     { id: "config", label: "Configurações", icon: "settings" },
   ];
@@ -1869,7 +1870,8 @@ function StudioApp({ studio, setStudio, onLogout }) {
     agenda: <AgendaTab studio={fullStudio} updateStudio={updateStudio} onMenu={() => setMobileOpen(true)} />,
     clientes: <ClientsTab studio={fullStudio} updateStudio={updateStudio} onMenu={() => setMobileOpen(true)} />,
     servicos: <ServicesTab studio={fullStudio} updateStudio={updateStudio} onMenu={() => setMobileOpen(true)} />,
-    pagamentos: <PaymentsTab studio={fullStudio} onMenu={() => setMobileOpen(true)} />,
+    faturamento: <PaymentsTab studio={fullStudio} onMenu={() => setMobileOpen(true)} />,
+pagamentos: <PaymentsTab studio={fullStudio} onMenu={() => setMobileOpen(true)} />,
     config: <ConfigTab studio={fullStudio} updateStudio={updateStudio} onMenu={() => setMobileOpen(true)} />,
   };
 
