@@ -2521,7 +2521,7 @@ function PublicBookingPage({ slug, onGoLanding }) {
         <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-2)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 12 }}>3. Escolha o horário</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 28 }}>
           {slots.map(t => {
-            const taken = takenTimes.includes(t);
+            const taken = isSlotTaken(t);
             return (
               <button key={t} disabled={taken} onClick={() => setTime(t)} style={{
                 padding: "10px 4px", borderRadius: 10, fontSize: 13.5, fontWeight: 500,
