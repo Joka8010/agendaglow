@@ -1357,10 +1357,10 @@ function MonthCalendar({ appointments, selectedDate, onSelect }) {
 }
 
 
-function AppointmentModal({ studio, onClose, onSave, editing }) {
+function AppointmentModal({ studio, onClose, onSave, editing, initialDate }) {
   const [clientId, setClientId] = useState(editing?.clientId || studio.clients[0]?.id || "");
   const [serviceIds, setServiceIds] = useState(editing ? [editing.serviceId] : (studio.services[0] ? [studio.services[0].id] : [])); const toggleService = (id) => setServiceIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  const [date, setDate] = useState(editing?.date || todayISO());
+  const [date, setDate] = useState(editing?.date || initialDate || todayISO());
   const [time, setTime] = useState(editing?.time || "09:00");
   const [status, setStatus] = useState(editing?.status || "confirmado");
 
@@ -1553,7 +1553,7 @@ const pendingAppts = studio.appointments.filter(a => a.status === "pendente").so
         </div>
       )}
 
-      {modalOpen && <AppointmentModal studio={studio} editing={editing} onClose={() => { setModalOpen(false); setEditing(null); }} onSave={saveAppt} />}
+      {modalOpen && <AppointmentModal studio={studio} editing={editing} onClose={() => { setModalOpen(false); setEditing(null); }} onSave={saveAppt} initialDate={selectedDate} />}
     </div>
   );
 }
