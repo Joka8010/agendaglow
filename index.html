@@ -1438,7 +1438,7 @@ function AppointmentModal({ studio, onClose, onSave, editing, initialDate }) {
           </div>
         </a>
       )}
-      <button className="btn btn-primary btn-block" disabled={!canSave} style={{ opacity: canSave ? 1 : 0.5 }} onClick={() => { const [h, m] = time.split(":").map(Number); const totalMin = h * 60 + m + totalDuration; const endTime = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`; onSave({ clientId, serviceIds, date, time, endTime, status, price: priceOverride !== "" ? Number(priceOverride) : null }); }}
+      <button className="btn btn-primary btn-block" disabled={!canSave} style={{ opacity: canSave ? 1 : 0.5 }} onClick={() => { const [h, m] = time.split(":").map(Number); const totalMin = h * 60 + m + totalDuration; const endTime = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`; onSave({ clientId, serviceIds, date, time, endTime, status, price: priceOverride !== "" ? Number(priceOverride) : null }); }}>
         {editing ? "Salvar alterações" : "Criar agendamento"}
       </button>
     </Modal>
