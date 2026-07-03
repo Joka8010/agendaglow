@@ -1459,8 +1459,6 @@ const pendingAppts = studio.appointments.filter(a => a.status === "pendente").so
   const saveAppt = async (data) => {
       const { serviceIds, ...rest } = data;
       const ids = serviceIds && serviceIds.length > 0 ? serviceIds : [data.serviceId];
-    console.log("DEBUG rest:", rest);
-      console.log("DEBUG appointments:", studio.appointments);
     const conflito = studio.appointments.some(a =>
         a.date === rest.date &&
         a.status !== "cancelado" &&
