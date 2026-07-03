@@ -1440,7 +1440,7 @@ function AppointmentModal({ studio, onClose, onSave, editing, initialDate }) {
 
 function AgendaTab({ studio, updateStudio, onMenu }) {
   const toast = useToast();
-  const [selectedDate, setSelectedDate] = useState(todayISO());
+  const [selectedDate, setSelectedDate] = useState(todayISO());     const [blockModal, setBlockModal] = useState(false);     const [blockType, setBlockType] = useState("periodo");     const [blockStart, setBlockStart] = useState("08:00");     const [blockEnd, setBlockEnd] = useState("12:00");     const [blockReason, setBlockReason] = useState("");     const [blockDate, setBlockDate] = useState(todayISO());     const saveBlock = async () => {       if (blockType === "dia") {         await DB.createAppointment(studio.id, { clientId: null, serviceId: null, date: blockDate, time: "08:00", endTime: "18:00", status: "bloqueado", reason: blockReason });       } else {         await DB.createAppointment(studio.id, { clientId: null, serviceId: null, date: blockDate, time: blockStart, endTime: blockEnd, status: "bloqueado", reason: blockReason });       }       updateStudio({ ...studio, appointments: [...studio.appointments, { id: Date.now().toString(), clientId: null, serviceId: null, date: blockDate, time: blockType === "dia" ? "08:00" : blockStart, endTime: blockType === "dia" ? "18:00" : blockEnd, status: "bloqueado", reason: blockReason }] });       setBlockModal(false);       setBlockReason("");       toast("Horário bloqueado!");     };
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
 
@@ -1545,8 +1545,8 @@ const pendingAppts = studio.appointments.filter(a => a.status === "pendente").so
       </div>
 
       {dayAppts.length === 0 ? (
-        <EmptyState icon="calendar" title="Nenhum horário neste dia" body="Crie um novo agendamento ou compartilhe seu link para que clientes marquem direto." action={
-          <button className="btn btn-primary" onClick={() => setModalOpen(true)}><Icon name="plus" size={15} /> Novo agendamento             </button>             <button className="btn btn-ghost btn-sm" onClick={() => { setBlockDate(selectedDate || todayISO()); setBlockModal(true); }} style={{ color: "var(--danger)" }}>               <Icon name="shield" size={15} /> Bloquear horário</button>
+        <EmptyState icon="calendar" title="Nenhum horário neste dia" body="Crie um novo agendamento ou compartilhe seu link para que clientes marquem direto." action={<>
+          <button className="btn btn-primary" onClick={() => setModalOpen(true)}><Icon name="plus" size={15} /> Novo agendamento             </button>             <button className="btn btn-ghost btn-sm" onClick={() => { setBlockDate(selectedDate || todayISO()); setBlockModal(true); }} style={{ color: "var(--danger)" }}>               <Icon name="shield" size={15} /> Bloquear horário</button></>
         } />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
