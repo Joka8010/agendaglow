@@ -1463,8 +1463,7 @@ const pendingAppts = studio.appointments.filter(a => a.status === "pendente").so
       if (editing) {
         // Atualiza o serviço principal do registro existente
         await DB.updateAppointment(editing.id, { ...rest, serviceId: ids[0], price: rest.price });
-        let appts = studio.appointments.map(a => a.id === editing.id ? { ...a, ...rest, serviceId: ids[0] } : a);
-
+        let appts = studio.appointments.map(a => a.id === editing.id ? { ...a, ...rest, serviceId: ids[0], price: rest.price } : a);
         // Se marcou serviços extras na edição, cria linhas novas no mesmo grupo
         const groupId = editing.groupId || editing.id;
         if (!editing.groupId) {
