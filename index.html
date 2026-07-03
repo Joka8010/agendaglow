@@ -1362,8 +1362,24 @@ function AppointmentModal({ studio, onClose, onSave, editing, initialDate }) {
   const [serviceIds, setServiceIds] = useState(editing ? [editing.serviceId] : (studio.services[0] ? [studio.services[0].id] : [])); const toggleService = (id) => setServiceIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const [date, setDate] = useState(editing?.date || initialDate || todayISO());
   const [time, setTime] = useState(editing?.time || "09:00");
-  const [status, setStatus] = useState(editing?.status || "confirmado");
-
+ const [status, setStatus] = useState(editing?.status || "confirmado");
+  const [blockModal, setBlockModal] = useState(false);
+  const [blockType, setBlockType] = useState("periodo");
+  const [blockStart, setBlockStart] = useState("08:00");
+  const [blockEnd, setBlockEnd] = useState("12:00");
+  const [blockReason, setBlockReason] = useState("");
+  const [blockDate, setBlockDate] = useState(initialDate || todayISO());
+  const saveBlock = async () => {
+    if (blockType === "dia") {
+      await DB.createAppointment(studio.id, { clientId: null, serviceId: null, date: blockDate, time: "08:00", endTime: "18:00", status: "bloqueado", reason: blockReason });
+    } else {
+      await DB.createAppointment(studio.id, { clientId: null, serviceId: null, date: blockDate, time: blockStart, endTime: blockEnd, status: "bloqueado", reason: blockReason });
+    }
+    updateStudio({ ...studio, appointments: [...studio.appointments, { id: Date.now().toString(), clientId: null, serviceId: null, date: blockDate, time: blockStart, endTime: blockType === "dia" ? "18:00" : blockEnd, status: "bloqueado", reason: blockReason }] });
+    setBlockModal(false);
+    setBlockReason("");
+    toast("Horário bloqueado!");
+  };
   const canSave = clientId && serviceIds.length > 0 && date && time;
   const client = studio.clients.find(c => c.id === clientId);
   const selectedServices = studio.services.filter(s => serviceIds.includes(s.id)); const totalPrice = selectedServices.reduce((sum, s) => sum + (s.price || 0), 0); const totalDuration = selectedServices.reduce((sum, s) => sum + (s.duration || 30), 0);
@@ -1490,7 +1506,7 @@ const pendingAppts = studio.appointments.filter(a => a.status === "pendente").so
     <div>
       <TopBar title="Agenda" onMenu={onMenu} right={
         <button className="btn btn-primary btn-sm" onClick={() => { setEditing(null); setModalOpen(true); }}>
-          <Icon name="plus" size={15} /> Novo agendamento
+          <Icon name="plus" size={15} /> Novo agendamento             </button>             <button className="btn btn-ghost btn-sm" onClick={() => { setBlockDate(selectedDate || todayISO()); setBlockModal(true); }} style={{ color: "var(--danger)" }}>               <Icon name="shield" size={15} /> Bloquear horário
         </button>
       } />
 
@@ -1526,13 +1542,27 @@ const pendingAppts = studio.appointments.filter(a => a.status === "pendente").so
 
       {dayAppts.length === 0 ? (
         <EmptyState icon="calendar" title="Nenhum horário neste dia" body="Crie um novo agendamento ou compartilhe seu link para que clientes marquem direto." action={
-          <button className="btn btn-primary" onClick={() => setModalOpen(true)}><Icon name="plus" size={15} /> Novo agendamento</button>
+          <button className="btn btn-primary" onClick={() => setModalOpen(true)}><Icon name="plus" size={15} /> Novo agendamento             </button>             <button className="btn btn-ghost btn-sm" onClick={() => { setBlockDate(selectedDate || todayISO()); setBlockModal(true); }} style={{ color: "var(--danger)" }}>               <Icon name="shield" size={15} /> Bloquear horário</button>
         } />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {dayAppts.map(a => {
             const client = getClient(a.clientId), service = getService(a.serviceId);
-            return (
+           if (a.status === "bloqueado") return (
+            <div key={a.id} className="card" style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", borderLeft: "4px solid var(--danger)", background: "rgba(255,80,80,0.06)" }}>
+              <div style={{ textAlign: "center", minWidth: 54 }}>
+                <p className="serif" style={{ fontSize: 18, fontWeight: 500 }}>{a.time}</p>
+                {a.endTime && <p style={{ fontSize: 11, color: "var(--danger)" }}>até {a.endTime}</p>}
+              </div>
+              <div style={{ fontSize: 20 }}>🚫</div>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontWeight: 600, color: "var(--danger)" }}>Horário bloqueado</p>
+                {a.reason && <p style={{ fontSize: 13, color: "var(--text-2)" }}>{a.reason}</p>}
+              </div>
+              <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={async () => { await DB.deleteAppointment(a.id); updateStudio({ ...studio, appointments: studio.appointments.filter(x => x.id !== a.id) }); toast("Bloqueio removido"); }}>Remover</button>
+            </div>
+         );
+      return (
               <div key={a.id} className="card" style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
                 <div style={{ textAlign: "center", minWidth: 54 }}>
                   <p className="serif" style={{ fontSize: 18, fontWeight: 500 }}>{a.time}</p>
@@ -1553,6 +1583,38 @@ const pendingAppts = studio.appointments.filter(a => a.status === "pendente").so
         </div>
       )}
 
+     {blockModal && <Modal onClose={() => setBlockModal(false)}>
+        <ModalHeader title="Bloquear horário" onClose={() => setBlockModal(false)} />
+        <Field label="Data">
+          <input type="date" value={blockDate} onChange={e => setBlockDate(e.target.value)} style={{ background: "var(--bg-2)", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 12px", color: "var(--text-1)", fontSize: 14, width: "100%" }} />
+        </Field>
+        <Field label="Tipo de bloqueio">
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {[{id:"dia",label:"Dia todo"},{id:"periodo",label:"Período"},{id:"horas",label:"Horas específicas"}].map(t => (
+              <button key={t.id} onClick={() => setBlockType(t.id)} style={{ padding: "6px 14px", borderRadius: 8, border: blockType === t.id ? "2px solid var(--lilac)" : "1px solid var(--line)", background: blockType === t.id ? "rgba(199,125,255,0.1)" : "var(--bg-2)", color: "var(--text-1)", cursor: "pointer", fontSize: 13 }}>{t.label}</button>
+            ))}
+          </div>
+        </Field>
+        {blockType === "periodo" && (
+          <div style={{ display: "flex", gap: 12 }}>
+            <Field label="Das"><input type="time" value={blockStart} onChange={e => setBlockStart(e.target.value)} style={{ background: "var(--bg-2)", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 12px", color: "var(--text-1)", fontSize: 14 }} /></Field>
+            <Field label="Até"><input type="time" value={blockEnd} onChange={e => setBlockEnd(e.target.value)} style={{ background: "var(--bg-2)", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 12px", color: "var(--text-1)", fontSize: 14 }} /></Field>
+          </div>
+        )}
+        {blockType === "horas" && (
+          <Field label="Selecione os horários">
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {["08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30"].map(h => (
+                <button key={h} onClick={() => { setBlockStart(h); setBlockEnd(h); }} style={{ padding: "6px 10px", borderRadius: 8, border: blockStart === h ? "2px solid var(--danger)" : "1px solid var(--line)", background: blockStart === h ? "rgba(255,80,80,0.1)" : "var(--bg-2)", color: "var(--text-1)", cursor: "pointer", fontSize: 13 }}>{h}</button>
+              ))}
+            </div>
+          </Field>
+        )}
+        <Field label="Motivo (opcional)">
+          <input type="text" placeholder="Ex: Consulta médica, folga..." value={blockReason} onChange={e => setBlockReason(e.target.value)} style={{ background: "var(--bg-2)", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 12px", color: "var(--text-1)", fontSize: 14, width: "100%" }} />
+        </Field>
+        <button className="btn btn-primary btn-block" onClick={saveBlock} style={{ marginTop: 8, background: "var(--danger)", borderColor: "var(--danger)" }}>Confirmar bloqueio</button>
+      </Modal>}
       {modalOpen && <AppointmentModal studio={studio} editing={editing} onClose={() => { setModalOpen(false); setEditing(null); }} onSave={saveAppt} initialDate={selectedDate} />}
     </div>
   );
