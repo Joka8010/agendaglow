@@ -517,7 +517,7 @@ const DB = {
   async createAppointment(studioId, { clientId, serviceId, date, time, status, groupId, endTime, reason }) {
     const { data, error } = await supabaseClient.from("appointments").insert({ studio_id: studioId, client_id: clientId, service_id: serviceId, date, time, status, group_id: groupId, end_time: endTime, reason }).select().single();
     if (error) throw error;
-   return { id: data.id, clientId: data.client_id, serviceId: data.service_id, date: data.date, time: data.time, status: data.status, groupId: data.group_id, endTime: data.end_time, reason: data.reason };
+   return { id: data.id, clientId: data.client_id, serviceId: data.service_id, date: data.date, time: data.time, status: data.status, groupId: data.group_id, endTime: data.end_time, reason: data.reason, price: data.price };
   },
   async updateAppointment(apptId, patch) {
     const payload = {};
@@ -1581,7 +1581,7 @@ const pendingAppts = studio.appointments.filter(a => a.status === "pendente").so
                 <Avatar name={client?.name || "?"} size={40} />
                 <div style={{ flex: 1, minWidth: 140 }}>
                   <p style={{ fontWeight: 600, fontSize: 14.5 }}>{client?.name}</p>
-                  <p style={{ fontSize: 13, color: "var(--text-2)" }}>{service?.name} · {fmtBRL(service?.price || 0)}</p>
+                  <p style={{ fontSize: 13, color: "var(--text-2)" }}>{service?.name} · {fmtBRL(a.price != null ? a.price : (service?.price || 0))}</p>
                 </div>
                 <StatusBadge status={a.status} />
                 <div style={{ display: "flex", gap: 6 }}>
