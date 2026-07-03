@@ -1459,6 +1459,17 @@ const pendingAppts = studio.appointments.filter(a => a.status === "pendente").so
   const saveAppt = async (data) => {
       const { serviceIds, ...rest } = data;
       const ids = serviceIds && serviceIds.length > 0 ? serviceIds : [data.serviceId];
+    const conflito = studio.appointments.some(a =>
+        a.date === rest.date &&
+        a.status !== "cancelado" &&
+        (!editing || (a.id !== editing.id && a.groupId !== (editing.groupId || editing.id))) &&
+        rest.time < (a.endTime || a.time) &&
+        rest.endTime > a.time
+      );
+      if (conflito) {
+        const confirmar = window.confirm("⚠️ Este horário já está ocupado por outro agendamento. Deseja marcar mesmo assim?");
+        if (!confirmar) return;
+      }
 
       if (editing) {
         // Atualiza o serviço principal do registro existente
