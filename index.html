@@ -512,12 +512,12 @@ const DB = {
   async listAppointments(studioId) {
     const { data, error } = await supabaseClient.from("appointments").select("*").eq("studio_id", studioId).order("date").order("time");
     if (error || !data) return [];
-    return data.map(r => ({ id: r.id, clientId: r.client_id, serviceId: r.service_id, date: r.date, time: r.time, status: r.status, groupId: r.group_id }));
+    return data.map(r => ({ id: r.id, clientId: r.client_id, serviceId: r.service_id, date: r.date, time: r.time, status: r.status, groupId: r.group_id, endTime: r.end_time, reason: r.reason }));
   },
-  async createAppointment(studioId, { clientId, serviceId, date, time, status, groupId }) {
-    const { data, error } = await supabaseClient.from("appointments").insert({ studio_id: studioId, client_id: clientId, service_id: serviceId, date, time, status: status || "confirmado", group_id: groupId || null }).select().single();
+  async createAppointment(studioId, { clientId, serviceId, date, time, status, groupId, endTime, reason }) {
+    const { data, error } = await supabaseClient.from("appointments").insert({ studio_id: studioId, client_id: clientId, service_id: serviceId, date, time, status, group_id: groupId, end_time: endTime, reason });
     if (error) throw error;
-    return { id: data.id, clientId: data.client_id, serviceId: data.service_id, date: data.date, time: data.time, status: data.status, groupId: data.group_id };
+   return { id: data.id, clientId: data.client_id, serviceId: data.service_id, date: data.date, time: data.time, status: data.status, groupId: data.group_id, endTime: data.end_time, reason: data.reason };
   },
   async updateAppointment(apptId, patch) {
     const payload = {};
