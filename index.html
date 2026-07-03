@@ -1505,11 +1505,15 @@ const pendingAppts = studio.appointments.filter(a => a.status === "pendente").so
   return (
     <div>
       <TopBar title="Agenda" onMenu={onMenu} right={
-        <button className="btn btn-primary btn-sm" onClick={() => { setEditing(null); setModalOpen(true); }}>
-          <Icon name="plus" size={15} /> Novo agendamento             </button>             <button className="btn btn-ghost btn-sm" onClick={() => { setBlockDate(selectedDate || todayISO()); setBlockModal(true); }} style={{ color: "var(--danger)" }}>               <Icon name="shield" size={15} /> Bloquear horário
-        </button>
-      } />
-
+          <>
+            <button className="btn btn-primary btn-sm" onClick={() => { setEditing(null); setModalOpen(true); }}>
+              <Icon name="plus" size={15} /> Novo agendamento
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setBlockDate(selectedDate || todayISO()); setBlockModal(true); }} style={{ color: "var(--danger)" }}>
+              <Icon name="shield" size={15} /> Bloquear horário
+            </button>
+          </>
+        } />
      {pendingAppts.length > 0 && (
           <div className="card" style={{ marginBottom: 20, border: "1px solid rgba(240,180,41,0.35)", background: "rgba(240,180,41,0.06)" }}>
             <p style={{ fontWeight: 600, fontSize: 14.5, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
