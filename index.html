@@ -523,7 +523,8 @@ const DB = {
     const payload = {};
     if (patch.clientId !== undefined) payload.client_id = patch.clientId;
     if (patch.serviceId !== undefined) payload.service_id = patch.serviceId;
-    if (patch.date !== undefined) payload.date = patch.date;
+    if (patch.date !== undefined) payload.date = patch.date; 
+    if (patch.price !== undefined) payload.price = patch.price;
     if (patch.time !== undefined) payload.time = patch.time;
     if (patch.status !== undefined) payload.status = patch.status;
     const { error } = await supabaseClient.from("appointments").update(payload).eq("id", apptId);
@@ -1362,7 +1363,8 @@ function AppointmentModal({ studio, onClose, onSave, editing, initialDate }) {
   const [serviceIds, setServiceIds] = useState(editing ? [editing.serviceId] : (studio.services[0] ? [studio.services[0].id] : [])); const toggleService = (id) => setServiceIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const [date, setDate] = useState(editing?.date || initialDate || todayISO());
   const [time, setTime] = useState(editing?.time || "09:00");
- const [status, setStatus] = useState(editing?.status || "confirmado");
+ const [status, setStatus] = useState(editing?.status || "confirmado"); 
+  const [priceOverride, setPriceOverride] = useState(editing?.price != null ? String(editing.price) : "");
   const [blockModal, setBlockModal] = useState(false);
   const [blockType, setBlockType] = useState("periodo");
   const [blockStart, setBlockStart] = useState("08:00");
@@ -1410,7 +1412,12 @@ function AppointmentModal({ studio, onClose, onSave, editing, initialDate }) {
                   )}
                 </Field>
       <div style={{ display: "flex", gap: 12 }}>
-        <Field label="Data"><input type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>
+       <Field label="Valor cobrado (deixe em branco para usar o preço dos serviços)">
+            <input type="number" min="0" step="0.01" placeholder={String(totalPrice)} value={priceOverride} onChange={e => setPriceOverride(e.target.value)} style={{ width: "100%", background: "var(--bg-2)", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 12px", color: "var(--text-1)", fontSize: 14 }} />
+          </Field>
+          <Field label="Data">
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} />
+          </Field>
         <Field label="Horário"><input type="time" value={time} onChange={e => setTime(e.target.value)} /></Field>
       </div>
       <Field label="Status">
@@ -1431,7 +1438,7 @@ function AppointmentModal({ studio, onClose, onSave, editing, initialDate }) {
           </div>
         </a>
       )}
-      <button className="btn btn-primary btn-block" disabled={!canSave} style={{ opacity: canSave ? 1 : 0.5 }} onClick={() => onSave({ clientId, serviceIds, date, time, status })}>
+      <button className="btn btn-primary btn-block" disabled={!canSave} style={{ opacity: canSave ? 1 : 0.5 }} onClick={() => onSave({ clientId, serviceIds, date, time, status, price: priceOverride !== "" ? Number(priceOverride) : null })}>
         {editing ? "Salvar alterações" : "Criar agendamento"}
       </button>
     </Modal>
@@ -1455,7 +1462,7 @@ const pendingAppts = studio.appointments.filter(a => a.status === "pendente").so
 
       if (editing) {
         // Atualiza o serviço principal do registro existente
-        await DB.updateAppointment(editing.id, { ...rest, serviceId: ids[0] });
+        await DB.updateAppointment(editing.id, { ...rest, serviceId: ids[0], price: rest.price });
         let appts = studio.appointments.map(a => a.id === editing.id ? { ...a, ...rest, serviceId: ids[0] } : a);
 
         // Se marcou serviços extras na edição, cria linhas novas no mesmo grupo
@@ -1465,7 +1472,7 @@ const pendingAppts = studio.appointments.filter(a => a.status === "pendente").so
           appts = appts.map(a => a.id === editing.id ? { ...a, groupId } : a);
         }
         for (let i = 1; i < ids.length; i++) {
-          const created = await DB.createAppointment(studio.id, { ...rest, serviceId: ids[i], groupId });
+          const created = await DB.createAppointment(studio.id, { ...rest, serviceId: ids[1], groupId, price: rest.price });
           appts = [...appts, created];
         }
         updateStudio({ ...studio, appointments: appts });
