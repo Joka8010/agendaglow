@@ -1490,7 +1490,7 @@ const pendingAppts = studio.appointments.filter(a => a.status === "pendente").so
         updateStudio({ ...studio, appointments: appts });
         toast("Agendamento atualizado");
       } else {
-        const groupId = ids.length > 1 ? uid("grp") : null;
+        const groupId = ids.length > 1 ? crypto.randomUUID() : null;
         let appts = [...studio.appointments];
         for (const sid of ids) {
           const created = await DB.createAppointment(studio.id, { ...rest, serviceId: sid, groupId });
