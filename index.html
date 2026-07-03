@@ -1411,7 +1411,7 @@ function AppointmentModal({ studio, onClose, onSave, editing, initialDate }) {
                     </p>
                   )}
                 </Field>
-      <div style={{ display: "flex", gap: 12 }}>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
        <Field label="Valor cobrado (deixe em branco para usar o preço dos serviços)">
             <input type="number" min="0" step="0.01" placeholder={String(totalPrice)} value={priceOverride} onChange={e => setPriceOverride(e.target.value)} style={{ width: "100%", background: "var(--bg-2)", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 12px", color: "var(--text-1)", fontSize: 14 }} />
           </Field>
