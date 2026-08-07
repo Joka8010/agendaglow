@@ -2194,6 +2194,7 @@ function StudioDetailModal({ studio, onClose, onChangeStatus, onDelete, onRenewF
           <p style={{fontSize:13,color:"var(--danger)"}}>
             {bs==="bloqueado"?"⛔ Studio bloqueado por inadimplência.":"⚠ Pagamento pendente."} Vencimento: {fmtDate(studio.nextBilling)}.
           </p>
+          <button className="btn btn-primary btn-sm" style={{ marginTop: 10 }} onClick={handleRenew}>Liberar acesso gratuito por 30 dias</button>
         </div>
       )}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
