@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Agenda Glow — Sistema de agendamento para estúdios de estética</title>
+<title>Buchiron Agenda — Sistema de agendamento para estúdios de estética</title>
 
 <!-- PWA: aparece como app no celular -->
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Agenda Glow" />
-<meta name="application-name" content="Agenda Glow" />
+<meta name="apple-mobile-web-app-title" content="Buchiron Agenda" />
+<meta name="application-name" content="Buchiron Agenda" />
 <meta name="theme-color" content="#0F0D12" />
 <meta name="description" content="Sistema de agendamento para estúdios de estética. Agenda, clientes e link de agendamento online." />
 
@@ -22,8 +22,8 @@
 <script>
 (function() {
   const manifest = {
-    name: "Agenda Glow",
-    short_name: "Agenda Glow",
+    name: "Buchiron Agenda",
+    short_name: "Buchiron Agenda",
     description: "Sistema de agendamento para estúdios de estética",
     start_url: "./",
     display: "standalone",
@@ -703,7 +703,7 @@ function NavBar({ onLogin, onSignup }) {
           <div style={{ width: 32, height: 32, borderRadius: 9, background: "linear-gradient(135deg, var(--lilac), var(--gold))", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Icon name="sparkle" size={17} color="#1A1420" />
           </div>
-          <span className="serif" style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.01em" }}>Agenda Glow</span>
+          <span className="serif" style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.01em" }}>Buchiron Agenda</span>
         </div>
         <div className="nav-desktop" style={{ display: "flex", alignItems: "center", gap: 28 }}>
           <a href="#planos" style={{ fontSize: 14.5, color: "var(--text-1)" }}>Planos</a>
@@ -894,11 +894,11 @@ function FAQItem({ q, a }) {
 
 function FAQSection() {
   const faqs = [
-    { q: "O sistema avisa o cliente automaticamente pelo WhatsApp?", a: "Não. O Agenda Glow guarda o WhatsApp de cada cliente já organizado na sua agenda, mas o envio da mensagem de confirmação ou lembrete é feito por você, manualmente, quando quiser." },
+    { q: "O sistema avisa o cliente automaticamente pelo WhatsApp?", a: "Não. O Buchiron Agenda guarda o WhatsApp de cada cliente já organizado na sua agenda, mas o envio da mensagem de confirmação ou lembrete é feito por você, manualmente, quando quiser." },
     { q: "Posso cancelar quando quiser?", a: "Sim. O plano mensal não tem fidelidade. No plano anual, o valor já vem com desconto, então o cancelamento segue as condições contratadas." },
     { q: "Meus clientes acessam algum app?", a: "Não. Eles agendam direto pelo link do seu studio, no navegador do celular, sem precisar baixar nada." },
     { q: "Posso usar o nome do meu studio?", a: "Sim. Ao criar sua conta, você escolhe o nome que aparece para os seus clientes — pode ser o nome do seu studio ou o seu próprio nome." },
-    { q: "Quais formas de pagamento posso oferecer?", a: "Você escolhe entre Pix, cartão de crédito e boleto para receber dos seus próprios clientes, e também para pagar sua assinatura do Agenda Glow." },
+    { q: "Quais formas de pagamento posso oferecer?", a: "Você escolhe entre Pix, cartão de crédito e boleto para receber dos seus próprios clientes, e também para pagar sua assinatura do Buchiron Agenda." },
   ];
   return (
     <div id="faq" className="container" style={{ padding: "70px 28px", maxWidth: 720 }}>
@@ -928,7 +928,7 @@ function Footer({ onAdminLogin }) {
     <div style={{ borderTop: "1px solid var(--line)", padding: "32px 0" }}>
       <div className="container" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-2)", fontSize: 13.5 }}>
-          <Icon name="sparkle" size={14} /> Agenda Glow — © 2026
+          <Icon name="sparkle" size={14} /> Buchiron Agenda — © 2026
         </div>
         <button onClick={onAdminLogin} style={{ background: "none", border: "none", color: "var(--text-2)", fontSize: 12.5 }}>
           Acesso administrativo
@@ -968,7 +968,7 @@ function AuthShell({ children, onBack }) {
           <div style={{ width: 30, height: 30, borderRadius: 8, background: "linear-gradient(135deg, var(--lilac), var(--gold))", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Icon name="sparkle" size={15} color="#1A1420" />
           </div>
-          <span className="serif" style={{ fontSize: 18, fontWeight: 600 }}>Agenda Glow</span>
+          <span className="serif" style={{ fontSize: 18, fontWeight: 600 }}>Buchiron Agenda</span>
         </div>
         {children}
       </div>
@@ -1134,7 +1134,7 @@ function LoginScreen({ onBack, onLogin, onForgot, role }) {
           {role === "admin" ? "Acesso administrativo" : "Entrar na sua agenda"}
         </h2>
         <p style={{ fontSize: 14, color: "var(--text-2)", marginBottom: 24 }}>
-          {role === "admin" ? "Painel restrito ao administrador do Agenda Glow." : "Acesse o painel do seu studio."}
+          {role === "admin" ? "Painel restrito ao administrador do Buchiron Agenda." : "Acesse o painel do seu studio."}
         </p>
         {error && <div className="badge badge-danger" style={{ marginBottom: 16, display: "flex" }}>{error}</div>}
         <Field label="E-mail">
@@ -1258,7 +1258,7 @@ function StudioSidebar({ active, setActive, studio, onLogout, mobileOpen, setMob
           <div style={{ width: 30, height: 30, borderRadius: 8, background: "linear-gradient(135deg, var(--lilac), var(--gold))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <Icon name="sparkle" size={15} color="#1A1420" />
           </div>
-          <span className="serif" style={{ fontSize: 17, fontWeight: 600 }}>Agenda Glow</span>
+          <span className="serif" style={{ fontSize: 17, fontWeight: 600 }}>Buchiron Agenda</span>
         </div>
         <div className="card" style={{ padding: 12, marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
           <Avatar name={studio.name} size={36} tone="gold" />
@@ -1926,7 +1926,7 @@ function ConfigTab({ studio, updateStudio, onMenu }) {
 
         <div className="card">
           <p style={{ fontWeight: 600, marginBottom: 4 }}>Sua assinatura</p>
-          <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 16 }}>Gerencie seu plano do Agenda Glow</p>
+          <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 16 }}>Gerencie seu plano do Buchiron Agenda</p>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
             <span style={{ fontSize: 14, color: "var(--text-1)" }}>Plano atual</span>
             <span className="badge badge-lilac">{studio.plan === "anual" ? "Anual" : "Mensal"}</span>
@@ -1986,7 +1986,7 @@ function StudioApp({ studio, setStudio, onLogout }) {
             </p>
             <p style={{ color: "var(--text-2)", marginBottom: 24 }}>
               {bs === "cancelado"
-                ? "Sua assinatura do Agenda Glow foi cancelada. Para continuar usando o sistema, faça uma nova assinatura."
+                ? "Sua assinatura do Buchiron Agenda foi cancelada. Para continuar usando o sistema, faça uma nova assinatura."
                 : "Identificamos um problema com o pagamento da sua assinatura. Regularize para voltar a acessar o sistema."}
             </p>
             <button className="btn btn-ghost" style={{ width: "100%" }} onClick={onLogout}>Sair</button>
@@ -2036,7 +2036,7 @@ function AdminSidebar({ active, setActive, onLogout, mobileOpen, setMobileOpen }
           <div style={{ width: 30, height: 30, borderRadius: 8, background: "linear-gradient(135deg, var(--lilac), var(--gold))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <Icon name="sparkle" size={15} color="#1A1420" />
           </div>
-          <span className="serif" style={{ fontSize: 17, fontWeight: 600 }}>Agenda Glow</span>
+          <span className="serif" style={{ fontSize: 17, fontWeight: 600 }}>Buchiron Agenda</span>
         </div>
         <p className="badge badge-gold" style={{ alignSelf: "flex-start", marginBottom: 20 }}><Icon name="crown" size={12} /> Admin</p>
         <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1 }}>
@@ -2808,7 +2808,7 @@ function Root() {
 
     const studio = await DB.createStudio({ ownerId: user.id, ownerEmail: email, ownerName, studioName, slug, plan });
     await DB.createPayment(studio.id, {
-      label: `Assinatura Agenda Glow — Plano ${plan === "anual" ? "Anual" : "Mensal"}`,
+      label: `Assinatura Buchiron Agenda — Plano ${plan === "anual" ? "Anual" : "Mensal"}`,
       amount: plan === "anual" ? PLAN_PRICES.anual : PLAN_PRICES.mensal,
       method: payMethod, status: "pago", source: "manual",
     });
@@ -2816,7 +2816,7 @@ function Root() {
     setCurrentStudio(studio);
     setAuthUser(user);
     setView("studio");
-    setToast({ msg: `Bem-vinda à Agenda Glow! Plano ${plan === "anual" ? "anual" : "mensal"} ativado.`, type: "success", key: uid("t") });
+    setToast({ msg: `Bem-vinda à Buchiron Agenda! Plano ${plan === "anual" ? "anual" : "mensal"} ativado.`, type: "success", key: uid("t") });
   };
 
   const handleStudioLogin = async (email, password) => {
@@ -2898,7 +2898,7 @@ root.render(<Root />);
   </div>
   <div style="flex:1;min-width:0;">
     <p style="font-family:Inter,sans-serif;font-weight:700;font-size:14px;color:#F5F0E8;margin:0 0 2px;">
-      Instalar Agenda Glow</p>
+      Instalar Buchiron Agenda</p>
     <p style="font-family:Inter,sans-serif;font-size:12px;color:#8B8594;margin:0;">
       Adicione à tela inicial e acesse como app</p>
   </div>
