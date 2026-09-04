@@ -697,7 +697,7 @@ function NavBar({ onLogin, onSignup }) {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(15,13,18,0.78)", backdropFilter: "blur(14px)", borderBottom: "1px solid var(--line)" }}>
-      <div className="container" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 60 }}>
+      <div className="container" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 60, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 32, height: 32, borderRadius: 9, background: "linear-gradient(135deg, var(--lilac), var(--gold))", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <img src="buchiron_logo_400px.png" style={{ width: 32, height: 32, borderRadius: 8, objectFit: "cover" }} />
