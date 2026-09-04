@@ -697,14 +697,14 @@ function NavBar({ onLogin, onSignup }) {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(15,13,18,0.78)", backdropFilter: "blur(14px)", borderBottom: "1px solid var(--line)" }}>
-      <div className="container" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 72 }}>
+      <div className="container" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 60 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 32, height: 32, borderRadius: 9, background: "linear-gradient(135deg, var(--lilac), var(--gold))", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <img src="buchiron_logo_400px.png" style={{ width: 32, height: 32, borderRadius: 8, objectFit: "cover" }} />
           </div>
           <span className="serif" style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.01em" }}>Buchiron Agenda</span>
         </div>
-        <div className="nav-desktop" style={{ display: "flex", alignItems: "center", gap: 28 }}>
+        <div className="nav-mobile-hidden" style={{ display: "flex", alignItems: "center", gap: 28, "@media(max-width:640px)": { display: "none" } }}
           <a href="#planos" style={{ fontSize: 14.5, color: "var(--text-1)" }}>Planos</a>
           <a href="#recursos" style={{ fontSize: 14.5, color: "var(--text-1)" }}>Recursos</a>
           <a href="#faq" style={{ fontSize: 14.5, color: "var(--text-1)" }}>Dúvidas</a>
@@ -2706,7 +2706,7 @@ function LoadingScreen() {
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ width: 36, height: 36, borderRadius: "50%", border: "3px solid var(--bg-2)", borderTopColor: "var(--lilac)", animation: "spin 0.8s linear infinite" }} />
-      <style>{`@keyframes spin{ to{ transform:rotate(360deg); } }`}</style>
+      <style>{`@keyframes spin{ to{ transform:rotate(360deg); } } .nav-mobile-hidden { display: flex; } @media (max-width: 640px) { .nav-mobile-hidden { display: none !important; } }`}</style>
     </div>
   );
 }
